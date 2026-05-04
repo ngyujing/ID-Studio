@@ -282,7 +282,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
     </div>
     <div id="grp-name" class="form-group" style="display:none">
       <label class="form-label">Full Name</label>
-      <input id="auth-name" type="text" placeholder="Bryan Lum">
+      <input id="auth-name" type="text" placeholder="Your full name">
     </div>
     <div class="form-group">
       <label class="form-label">Email Address</label>
@@ -561,8 +561,8 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 // ─────────────────────────────────────────────────────
 //  !! PASTE YOUR SUPABASE CREDENTIALS BELOW !!
 // ─────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://atqgwproinykwfvvajkt.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cWd3cHJvaW55a3dmdnZhamt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MDQ2NDgsImV4cCI6MjA5MzM4MDY0OH0.U0dhv_BNpoXFyh_gTfxLAPCta5-kK_r5Q5Kh2wVQA0o'
+const SUPABASE_URL = 'YOUR_SUPABASE_URL'
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY'
 // ─────────────────────────────────────────────────────
 
 const { createClient } = supabase
@@ -953,11 +953,41 @@ async function addRoom(){
 }
 
 async function updateRoom(id,field,value){
-  ROOMS=ROOMS.map(r=>r.id===id?{...r,[field]:['length','width'].includes(field)?parseFloat(value)||0:value}:r)
-  renderRooms(); updateKPIs()
+  const parsed=['length','width'].includes(field)?parseFloat(value)||0:value
+  ROOMS=ROOMS.map(r=>r.id===id?{...r,[field]:parsed}:r)
+  if(field==='unit'){ renderRooms() }
+  else { updateRoomBadge(id); updateRoomsSummary() }
+  updateKPIs()
   debounce('room_'+id+'_'+field, async()=>{
-    await db.from('quotation_rooms').update({[field]:value}).eq('id',id)
+    await db.from('quotation_rooms').update({[field]:parsed}).eq('id',id)
   })
+}
+
+function updateRoomBadge(id){
+  const room=ROOMS.find(r=>r.id===id)
+  if(!room) return
+  const a=getArea(room)
+  const card=document.querySelector(`.room-card[data-rid="${id}"]`)
+  if(!card) return
+  const nums=card.querySelectorAll('.area-num')
+  if(nums[0]) nums[0].textContent=fmtN(a.sqm,2)
+  if(nums[1]) nums[1].textContent=fmtN(a.sqft,1)
+}
+
+function updateRoomsSummary(){
+  const summ=$('rooms-summ')
+  if(!ROOMS.length){ summ.style.display='none'; return }
+  summ.style.display='flex'
+  const tSqm=ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
+  const tSqft=ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
+  summ.innerHTML=`
+    <div class="sum-item"><div class="sum-val">${ROOMS.length}</div><div class="sum-lbl">Rooms</div></div>
+    <div class="vdiv"></div>
+    <div class="sum-item"><div class="sum-val">${fmtN(tSqm,1)}</div><div class="sum-lbl">Total sqm</div></div>
+    <div class="sum-item"><div class="sum-val">${fmtN(tSqft,0)}</div><div class="sum-lbl">Total sqft</div></div>
+    <div class="vdiv"></div>
+    ${ROOMS.map(r=>`<div class="sum-item"><div class="sum-val" style="font-size:15px">${fmtN(getArea(r).sqm,1)}</div><div class="sum-lbl">${esc(r.name)}</div></div>`).join('')}
+  `
 }
 
 async function deleteRoom(id){
@@ -975,7 +1005,7 @@ function renderRooms(){
   }
   grid.innerHTML=ROOMS.map(r=>{
     const a=getArea(r)
-    return `<div class="room-card">
+    return `<div class="room-card" data-rid="${r.id}">
       <div class="room-hd">
         <input class="room-name-inp" value="${esc(r.name)}" oninput="updateRoom('${r.id}','name',this.value)" placeholder="Room name">
         <button class="btn-del" onclick="deleteRoom('${r.id}')">✕</button>
@@ -996,19 +1026,7 @@ function renderRooms(){
       </div>
     </div>`
   }).join('')
-  // Summary bar
-  const summ=$('rooms-summ')
-  summ.style.display='flex'
-  const tSqm=ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
-  const tSqft=ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
-  summ.innerHTML=`
-    <div class="sum-item"><div class="sum-val">${ROOMS.length}</div><div class="sum-lbl">Rooms</div></div>
-    <div class="vdiv"></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tSqm,1)}</div><div class="sum-lbl">Total sqm</div></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tSqft,0)}</div><div class="sum-lbl">Total sqft</div></div>
-    <div class="vdiv"></div>
-    ${ROOMS.map(r=>`<div class="sum-item"><div class="sum-val" style="font-size:15px">${fmtN(getArea(r).sqm,1)}</div><div class="sum-lbl">${esc(r.name)}</div></div>`).join('')}
-  `
+  updateRoomsSummary()
 }
 
 // ═══════════════════════════════════════════════════
@@ -1030,11 +1048,11 @@ async function addItem(){
 async function updateItem(id,field,rawVal){
   const numFields=['quantity','cost_rate','client_rate']
   const val=numFields.includes(field)?parseFloat(rawVal)||0:rawVal
-  // local update
+  const needsFullRender=field==='trade_id'||field==='material_id'
+
   ITEMS=ITEMS.map(i=>{
     if(i.id!==id) return i
     let upd={...i,[field]:val}
-    // when trade changes, auto-fill first material's default rates
     if(field==='trade_id'){
       const mats=matsForTrade(val)
       if(mats.length){
@@ -1055,7 +1073,18 @@ async function updateItem(id,field,rawVal){
     }
     return upd
   })
-  renderItemsTable(); updateKPIs()
+
+  if(needsFullRender){
+    // Trade/material changes alter multiple fields — must re-render the whole row
+    renderItemsTable()
+  } else {
+    // Simple text/number change — update only the computed cells, keep focus
+    updateItemRowCells(id)
+    updateItemsFooter()
+    renderTotalsBar()
+  }
+  updateKPIs()
+
   debounce('item_'+id, async()=>{
     const item=ITEMS.find(i=>i.id===id)
     if(!item) return
@@ -1066,6 +1095,35 @@ async function updateItem(id,field,rawVal){
     }).eq('id',id)
     showSaved(true)
   })
+}
+
+// Update only the 3 computed read-only cells in a row — no inputs touched
+function updateItemRowCells(id){
+  const item=ITEMS.find(i=>i.id===id)
+  if(!item) return
+  const cx=Q?.complexity||1.0
+  const tc=(item.cost_rate||0)*(item.quantity||0)
+  const tr=(item.client_rate||0)*(item.quantity||0)*cx
+  const gpPct=tr>0?(tr-tc)/tr*100:0
+  const row=document.querySelector(`tr[data-iid="${id}"]`)
+  if(!row) return
+  // td indexes: 0=#, 1=room, 2=trade, 3=mat, 4=desc, 5=qty, 6=unit, 7=cost, 8=rate, 9=totcost, 10=totrev, 11=gp, 12=del
+  const cells=row.querySelectorAll('td')
+  if(cells[9])  cells[9].textContent=fmtC0(tc)
+  if(cells[10]){ cells[10].textContent=fmtC0(tr) }
+  if(cells[11]){ cells[11].textContent=fmtN(gpPct,1)+'%'; cells[11].className=gpPct>=0?'gp-pos':'gp-neg' }
+}
+
+function updateItemsFooter(){
+  const t=calcTotals()
+  const cx_lbl=CX_LABELS[t.cx.toFixed(1)]||'×'+t.cx
+  $('items-tfoot').innerHTML=`<tr>
+    <td colspan="9" style="padding:7px 8px;color:var(--txt3);font-size:10px;text-transform:uppercase;letter-spacing:.06em">TOTALS (${cx_lbl} ×${t.cx})</td>
+    <td class="num">${fmtC0(t.cost)}</td>
+    <td class="num" style="color:var(--gold2);font-weight:700">${fmtC0(t.rev)}</td>
+    <td class="${t.margin>=0?'gp-pos':'gp-neg'}">${fmtN(t.margin,1)}%</td>
+    <td></td>
+  </tr>`
 }
 
 async function deleteItem(id){
@@ -1090,7 +1148,7 @@ function renderItemsTable(){
     const tradeOpts=TRADES.map(t=>`<option value="${t.id}"${t.id===item.trade_id?' selected':''}>${esc(t.name)}</option>`).join('')
     const matOpts=trMats.map(m=>`<option value="${m.id}"${m.id===item.material_id?' selected':''}>${esc(m.name)}</option>`).join('')
     const unitOpts=UNITS.map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')
-    return `<tr>
+    return `<tr data-iid="${item.id}">
       <td style="text-align:center;color:var(--txt3)">${idx+1}</td>
       <td><select onchange="updateItem('${item.id}','room_name',this.value)"><option value="">—</option>${roomOpts}</select></td>
       <td><select onchange="updateItem('${item.id}','trade_id',this.value)"><option value="">—</option>${tradeOpts}</select></td>
@@ -1106,15 +1164,7 @@ function renderItemsTable(){
       <td><button class="btn-del" onclick="deleteItem('${item.id}')">✕</button></td>
     </tr>`
   }).join('')
-  const t=calcTotals()
-  const cx_lbl=CX_LABELS[t.cx.toFixed(1)]||'×'+t.cx
-  $('items-tfoot').innerHTML=`<tr>
-    <td colspan="9" style="padding:7px 8px;color:var(--txt3);font-size:10px;text-transform:uppercase;letter-spacing:.06em">TOTALS (${cx_lbl} ×${t.cx})</td>
-    <td class="num">${fmtC0(t.cost)}</td>
-    <td class="num" style="color:var(--gold2);font-weight:700">${fmtC0(t.rev)}</td>
-    <td class="${t.margin>=0?'gp-pos':'gp-neg'}">${fmtN(t.margin,1)}%</td>
-    <td></td>
-  </tr>`
+  updateItemsFooter()
   renderTotalsBar()
 }
 
