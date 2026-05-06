@@ -369,6 +369,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <button class="tab-btn"        id="tb-moodboard" onclick="switchTab('moodboard')">Moodboard</button>
       <button class="tab-btn"        id="tb-gantt"     onclick="switchTab('gantt')">Gantt</button>
       <button class="tab-btn"        id="tb-client"    onclick="switchTab('client')">Client View</button>
+      <button class="tab-btn"        id="tb-database"  onclick="switchTab('database')">Materials DB</button>
     </div>
 
     <!-- CONTENT AREA -->
@@ -463,6 +464,49 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
         <div id="client-doc"></div>
       </div>
 
+      <!-- MATERIALS DATABASE TAB -->
+      <div id="V-database" style="display:none">
+        <div class="sec-hd">
+          <div>
+            <div class="sec-title">Materials Database</div>
+            <div class="sec-sub">Add, edit or delete trades and materials. Changes apply instantly to all new quotations.</div>
+          </div>
+          <button class="btn-primary" onclick="openTradeModal(null)">+ Add Trade</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:start">
+
+          <!-- LEFT: Trades list -->
+          <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+            <div style="background:var(--s2);padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:var(--ff-h);font-size:15px;color:var(--gold)">Trades</span>
+            </div>
+            <div id="db-trade-list">
+              <div class="empty-state"><p>Loading…</p></div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Materials for selected trade -->
+          <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+            <div style="background:var(--s2);padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <span style="font-family:var(--ff-h);font-size:15px;color:var(--gold)" id="db-mats-title">Select a trade</span>
+              <button class="btn-primary" id="db-btn-add-mat" style="display:none;padding:5px 12px;font-size:11px" onclick="openMatModal(null)">+ Add Material</button>
+            </div>
+            <!-- Column headers -->
+            <div id="db-mat-header" style="display:none;background:var(--s2);border-bottom:1px solid var(--bdr);padding:6px 10px;display:grid;grid-template-columns:1fr 52px 72px 72px 72px 72px 64px;gap:4px;font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">
+              <div>Name</div><div>Unit</div>
+              <div style="text-align:right">HDB Cost</div><div style="text-align:right">HDB Rate</div>
+              <div style="text-align:right">Condo Cost</div><div style="text-align:right">Condo Rate</div>
+              <div></div>
+            </div>
+            <div id="db-mats-list">
+              <div class="empty-state"><div class="es-icon">▤</div><p>Click a trade on the left to view its materials</p></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- CALCULATORS -->
       <div id="V-calc" style="display:none">
         <div class="sec-hd">
@@ -549,6 +593,21 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
     </div><!-- /content-area -->
   </div><!-- /main-col -->
 </div><!-- /S-app -->
+
+<!-- TRADE / MATERIAL MODAL -->
+<div id="crud-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeModalBg(event)">
+  <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div style="font-family:var(--ff-h);font-size:18px;color:var(--gold)" id="crud-modal-title">Add Trade</div>
+      <button onclick="closeCrudModal()" style="background:transparent;border:none;color:var(--txt3);font-size:18px;cursor:pointer;padding:2px 6px">✕</button>
+    </div>
+    <div id="crud-modal-body"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--bdr)">
+      <button class="btn-ghost" onclick="closeCrudModal()">Cancel</button>
+      <button class="btn-primary" id="crud-save-btn" onclick="saveCrudModal()">Save</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast-wrap"></div>
 
@@ -658,7 +717,7 @@ function showScreen(n){
   $('S-app').style.display  = n==='app' ?'flex':'none'
 }
 
-const ALL_VIEWS=['dashboard','rooms','items','trades','moodboard','gantt','client','calc','settings']
+const ALL_VIEWS=['dashboard','rooms','items','trades','moodboard','gantt','client','calc','settings','database']
 function showView(id){
   ALL_VIEWS.forEach(v=>{ const e=$('V-'+v); if(e) e.style.display='none' })
   const t=$('V-'+id); if(t) t.style.display='block'
@@ -690,6 +749,7 @@ function switchTab(tab){
   if(tab==='moodboard') renderMoodboard()
   if(tab==='gantt')     renderGantt()
   if(tab==='client')    renderClientView()
+  if(tab==='database')  renderDbPanel()
 }
 
 // ═══════════════════════════════════════════════════
@@ -1484,7 +1544,238 @@ function calcWin(){
 }
 
 // ═══════════════════════════════════════════════════
-// BOOT
+// MATERIALS DATABASE — CRUD
+// ═══════════════════════════════════════════════════
+let DB_SEL_TRADE = null
+let CRUD_MODE    = null
+let CRUD_DATA    = {}
+
+function renderDbPanel(){
+  renderDbTradeList()
+  if(DB_SEL_TRADE) renderDbMats(DB_SEL_TRADE)
+}
+
+function renderDbTradeList(){
+  const el = $('db-trade-list')
+  if(!TRADES.length){
+    el.innerHTML='<div class="empty-state"><p>No trades yet — click + Add Trade</p></div>'
+    return
+  }
+  el.innerHTML=TRADES.map(t=>{
+    const count=MATS.filter(m=>m.trade_id===t.id).length
+    const isSel=t.id===DB_SEL_TRADE
+    return `<div onclick="dbSelectTrade('${t.id}')"
+      style="padding:9px 14px;border-bottom:1px solid var(--bdr);cursor:pointer;display:flex;
+             align-items:center;justify-content:space-between;font-size:12px;transition:background .15s;
+             background:${isSel?'var(--s3)':'transparent'};color:${isSel?'var(--gold)':'var(--txt)'}">
+      <span style="font-weight:${isSel?'600':'400'}">${esc(t.name)}</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:var(--txt3)">${count}</span>
+        <button style="background:transparent;color:var(--blu);border:1px solid var(--blu);padding:2px 6px;font-size:9px;border-radius:4px;cursor:pointer"
+          onclick="event.stopPropagation();openTradeModal('${t.id}')">✎</button>
+        <button class="btn-del" style="padding:2px 6px;font-size:9px"
+          onclick="event.stopPropagation();dbDeleteTrade('${t.id}')">✕</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function dbSelectTrade(id){
+  DB_SEL_TRADE=id
+  const trade=TRADES.find(t=>t.id===id)
+  $('db-mats-title').textContent=trade?trade.name+' — Materials':'Materials'
+  $('db-btn-add-mat').style.display='inline-flex'
+  $('db-mat-header').style.display='grid'
+  renderDbTradeList()
+  renderDbMats(id)
+}
+
+function renderDbMats(tradeId){
+  const mats=MATS.filter(m=>m.trade_id===tradeId)
+  const el=$('db-mats-list')
+  if(!mats.length){
+    el.innerHTML='<div class="empty-state"><p>No materials yet — click + Add Material above</p></div>'
+    return
+  }
+  el.innerHTML=mats.map(m=>`
+    <div style="display:grid;grid-template-columns:1fr 52px 72px 72px 72px 72px 64px;gap:4px;
+                align-items:center;padding:7px 10px;border-bottom:1px solid var(--bdr);font-size:11px">
+      <div>
+        <div style="font-weight:500;color:var(--txt)">${esc(m.name)}</div>
+        ${m.description?`<div style="font-size:10px;color:var(--txt3);margin-top:1px">${esc(m.description)}</div>`:''}
+      </div>
+      <div style="color:var(--txt3)">${esc(m.default_unit||'')}</div>
+      <div style="text-align:right">${fmtC(m.cost_hdb||0)}</div>
+      <div style="text-align:right;color:var(--gold);font-weight:500">${fmtC(m.rate_hdb||0)}</div>
+      <div style="text-align:right">${fmtC(m.cost_condo||0)}</div>
+      <div style="text-align:right;color:var(--gold);font-weight:500">${fmtC(m.rate_condo||0)}</div>
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button style="background:transparent;color:var(--blu);border:1px solid var(--blu);padding:3px 6px;font-size:9px;border-radius:4px;cursor:pointer"
+          onclick="openMatModal('${m.id}')">✎</button>
+        <button class="btn-del" onclick="dbDeleteMat('${m.id}')">✕</button>
+      </div>
+    </div>`).join('')
+}
+
+// ── TRADE MODAL ──────────────────────────────────────
+function openTradeModal(id){
+  CRUD_MODE='trade'
+  const t=id?TRADES.find(x=>x.id===id):null
+  CRUD_DATA={id:t?.id||null}
+  $('crud-modal-title').textContent=t?'Edit Trade':'Add Trade'
+  $('crud-modal-body').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Trade Name *</label>
+      <input id="cm-trade-name" value="${esc(t?.name||'')}">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Sort Order (lower = first in lists)</label>
+      <input id="cm-trade-sort" type="number" value="${t?.sort_order??(TRADES.length+1)}">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Colour (hex, used in Gantt chart)</label>
+      <input id="cm-trade-color" value="${esc(t?.color||'#A0732A')}">
+    </div>`
+  $('crud-modal-bg').style.display='flex'
+  setTimeout(()=>$('cm-trade-name')?.focus(),80)
+}
+
+async function saveTrade(){
+  const name =$('cm-trade-name').value.trim()
+  const sort =parseInt($('cm-trade-sort').value)||0
+  const color=$('cm-trade-color').value.trim()||'#A0732A'
+  if(!name){toast('Trade name is required','err');return}
+  const btn=$('crud-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>'
+  let error
+  if(CRUD_DATA.id){
+    ({error}=await db.from('trades').update({name,sort_order:sort,color}).eq('id',CRUD_DATA.id))
+  } else {
+    ({error}=await db.from('trades').insert({name,sort_order:sort,color}))
+  }
+  btn.disabled=false;btn.textContent='Save'
+  if(error){toast('Error: '+error.message,'err');return}
+  toast(CRUD_DATA.id?'Trade updated':'Trade added ✓')
+  await loadStaticData();closeCrudModal();renderDbPanel()
+}
+
+async function dbDeleteTrade(id){
+  const count=MATS.filter(m=>m.trade_id===id).length
+  const msg=count>0?`This trade has ${count} material(s). Delete trade AND all its materials?`:'Delete this trade?'
+  if(!confirm(msg))return
+  const {error}=await db.from('trades').delete().eq('id',id)
+  if(error){toast('Delete failed: '+error.message,'err');return}
+  if(DB_SEL_TRADE===id){
+    DB_SEL_TRADE=null
+    $('db-mats-title').textContent='Select a trade'
+    $('db-btn-add-mat').style.display='none'
+    $('db-mat-header').style.display='none'
+    $('db-mats-list').innerHTML='<div class="empty-state"><div class="es-icon">▤</div><p>Click a trade on the left to view its materials</p></div>'
+  }
+  toast('Trade deleted');await loadStaticData();renderDbTradeList()
+}
+
+// ── MATERIAL MODAL ───────────────────────────────────
+function openMatModal(id){
+  if(!DB_SEL_TRADE&&!id){toast('Select a trade first','err');return}
+  CRUD_MODE='material'
+  const m=id?MATS.find(x=>x.id===id):null
+  CRUD_DATA={id:m?.id||null,trade_id:m?.trade_id||DB_SEL_TRADE}
+  const unitOpts=['sqft','sqm','pfr','no.','l.s.','rm','lot']
+    .map(u=>`<option${u===(m?.default_unit||'sqft')?' selected':''}>${u}</option>`).join('')
+  $('crud-modal-title').textContent=m?'Edit Material':'Add Material'
+  $('crud-modal-body').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Material / Spec Name *</label>
+      <input id="cm-mat-name" value="${esc(m?.name||'')}">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Default Description</label>
+      <input id="cm-mat-desc" value="${esc(m?.description||'')}" placeholder="Auto-fills when selected in quotation">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+      <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Default Unit</label>
+      <select id="cm-mat-unit" style="width:auto">${unitOpts}</select>
+    </div>
+    <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">HDB Rates (S$ per unit)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Contractor Cost</label>
+          <input id="cm-mat-ch" type="number" step="0.01" min="0" value="${m?.cost_hdb||0}">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Client Rate</label>
+          <input id="cm-mat-rh" type="number" step="0.01" min="0" value="${m?.rate_hdb||0}">
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Condo / Landed Rates (S$ per unit)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Contractor Cost</label>
+          <input id="cm-mat-cc" type="number" step="0.01" min="0" value="${m?.cost_condo||0}">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Client Rate</label>
+          <input id="cm-mat-rc" type="number" step="0.01" min="0" value="${m?.rate_condo||0}">
+        </div>
+      </div>
+    </div>`
+  $('crud-modal-bg').style.display='flex'
+  setTimeout(()=>$('cm-mat-name')?.focus(),80)
+}
+
+async function saveMaterial(){
+  const name=$('cm-mat-name').value.trim()
+  if(!name){toast('Material name is required','err');return}
+  const payload={
+    trade_id:    CRUD_DATA.trade_id,
+    name,
+    description: $('cm-mat-desc').value.trim(),
+    default_unit:$('cm-mat-unit').value,
+    cost_hdb:    parseFloat($('cm-mat-ch').value)||0,
+    rate_hdb:    parseFloat($('cm-mat-rh').value)||0,
+    cost_condo:  parseFloat($('cm-mat-cc').value)||0,
+    rate_condo:  parseFloat($('cm-mat-rc').value)||0,
+  }
+  const btn=$('crud-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>'
+  let error
+  if(CRUD_DATA.id){
+    ({error}=await db.from('materials').update(payload).eq('id',CRUD_DATA.id))
+  } else {
+    ({error}=await db.from('materials').insert(payload))
+  }
+  btn.disabled=false;btn.textContent='Save'
+  if(error){toast('Error: '+error.message,'err');return}
+  toast(CRUD_DATA.id?'Material updated':'Material added ✓')
+  await loadStaticData()
+  closeCrudModal()
+  if(DB_SEL_TRADE)renderDbMats(DB_SEL_TRADE)
+  renderDbTradeList()
+}
+
+async function dbDeleteMat(id){
+  if(!confirm('Delete this material?'))return
+  const {error}=await db.from('materials').delete().eq('id',id)
+  if(error){toast('Delete failed: '+error.message,'err');return}
+  toast('Material deleted')
+  await loadStaticData()
+  if(DB_SEL_TRADE)renderDbMats(DB_SEL_TRADE)
+  renderDbTradeList()
+}
+
+// ── MODAL HELPERS ────────────────────────────────────
+function saveCrudModal(){if(CRUD_MODE==='trade')saveTrade();else saveMaterial()}
+function closeModalBg(e){if(e.target===$('crud-modal-bg'))closeCrudModal()}
+function closeCrudModal(){
+  $('crud-modal-bg').style.display='none'
+  CRUD_MODE=null;CRUD_DATA={}
+  const btn=$('crud-save-btn');btn.disabled=false;btn.textContent='Save'
+}
+
+// ═══════════════════════════════════════════════════
+// BOOT — FINAL
 // ═══════════════════════════════════════════════════
 boot()
 </script>
