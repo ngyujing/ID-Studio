@@ -567,6 +567,42 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               <div class="calc-result-sub" id="wc-sub">3 windows · 2.0× fullness</div>
             </div>
           </div>
+
+          <!-- UNIT CONVERTER -->
+          <div class="calc-card">
+            <div class="calc-title">📏 Unit Converter</div>
+            <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:10px;margin-bottom:10px">
+              <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Length</div>
+              <div class="form-group">
+                <label class="form-label">Metres (m)</label>
+                <input type="number" id="uc-m" step="0.001" oninput="ucFrom('m',this.value)" placeholder="e.g. 3.5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Feet &amp; Inches (ft)</label>
+                <input type="number" id="uc-ft" step="0.001" oninput="ucFrom('ft',this.value)" placeholder="e.g. 11.48">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Millimetres (mm)</label>
+                <input type="number" id="uc-mm" step="1" oninput="ucFrom('mm',this.value)" placeholder="e.g. 3500">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Inches (in)</label>
+                <input type="number" id="uc-in" step="0.01" oninput="ucFrom('in',this.value)" placeholder="e.g. 137.8">
+              </div>
+            </div>
+            <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:10px">
+              <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Area</div>
+              <div class="form-group">
+                <label class="form-label">Square Metres (sqm)</label>
+                <input type="number" id="uc-sqm" step="0.01" oninput="ucFrom('sqm',this.value)" placeholder="e.g. 12.5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Square Feet (sqft)</label>
+                <input type="number" id="uc-sqft" step="0.01" oninput="ucFrom('sqft',this.value)" placeholder="e.g. 134.5">
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -1661,6 +1697,41 @@ function calcWin(){
   const fabric=w*h*n*ff
   $('wc-out').textContent=fabric.toFixed(2)+' sqm'
   $('wc-sub').textContent=`${n} window${n!==1?'s':''} · ${ff}× fullness · ${(w*h*n).toFixed(2)} sqm raw area`
+}
+
+// ── Unit converter ────────────────────────────────
+const UC_PREC = 4
+function ucFrom(unit, raw){
+  const v = parseFloat(raw)
+  // Clear all sibling fields if input is empty
+  if(isNaN(v) || String(raw).trim()===''){
+    const lengthIds=['uc-m','uc-ft','uc-mm','uc-in']
+    const areaIds  =['uc-sqm','uc-sqft']
+    if(lengthIds.includes('uc-'+unit)) lengthIds.forEach(id=>{ if(id!=='uc-'+unit){ const e=$(id);if(e)e.value='' } })
+    if(areaIds.includes('uc-'+unit))   areaIds.forEach(id=>  { if(id!=='uc-'+unit){ const e=$(id);if(e)e.value='' } })
+    return
+  }
+  // Length conversions — convert input to metres first, then fan out
+  if(['m','ft','mm','in'].includes(unit)){
+    let metres = v
+    if(unit==='ft')  metres = v / 3.28084
+    if(unit==='mm')  metres = v / 1000
+    if(unit==='in')  metres = v / 39.3701
+    const targets = {
+      'uc-m':  +metres.toFixed(UC_PREC),
+      'uc-ft': +(metres * 3.28084).toFixed(UC_PREC),
+      'uc-mm': +(metres * 1000).toFixed(1),
+      'uc-in': +(metres * 39.3701).toFixed(UC_PREC),
+    }
+    Object.entries(targets).forEach(([id,val])=>{ if(id!=='uc-'+unit){ const e=$(id);if(e)e.value=val } })
+  }
+  // Area conversions
+  if(unit==='sqm'){
+    const e=$('uc-sqft'); if(e) e.value=+(v*SQM_TO_SQFT).toFixed(UC_PREC)
+  }
+  if(unit==='sqft'){
+    const e=$('uc-sqm'); if(e) e.value=+(v/SQM_TO_SQFT).toFixed(UC_PREC)
+  }
 }
 
 // ═══════════════════════════════════════════════════
