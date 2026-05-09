@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFFFF">
 <title>YJ Studio — Quotation Tool</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -266,18 +269,230 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
 .gold-c{color:var(--gold2)}.grn-c{color:var(--grn)}.red-c{color:var(--red)}
-#toast-wrap{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:7px;z-index:9999;pointer-events:none}
+#toast-wrap{position:fixed;bottom:80px;right:16px;display:flex;flex-direction:column;gap:7px;z-index:9999;pointer-events:none}
+@media(min-width:769px){#toast-wrap{bottom:20px;right:20px}}
 .toast{background:var(--s1);border:1px solid var(--bdr);border-radius:5px;padding:10px 14px;font-size:12px;color:var(--txt);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:200px;animation:toastIn .2s ease}
 .toast.ok{border-color:var(--grn)}.toast.err{border-color:var(--red)}
 @keyframes toastIn{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
 
 @media print{
   .sidebar,.top-bar,.kpi-strip,.tab-bar,#V-rooms,#V-items,#V-trades,#V-moodboard,
-  #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print{display:none!important}
+  #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print,
+  #bottom-nav,#mobile-back-btn{display:none!important}
   body,html{background:#fff!important}
   .content-area{padding:0!important}
   .cv-doc{border-radius:0;box-shadow:none}
   #V-client{display:block!important}
+}
+
+/* ══════════════════════════════════════════
+   MOBILE — iOS friendly
+   Max-width 768px targets phones & small tablets
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Prevent iOS auto-zoom on input focus — must be 16px */
+  input, select, textarea { font-size: 16px !important; }
+  td input, td select { font-size: 14px !important; }
+
+  /* Larger touch targets everywhere */
+  button { min-height: 40px; }
+  .btn-del, .btn-edit, .btn-add-wall { min-height: 32px; min-width: 32px; }
+
+  /* Remove sidebar — use bottom nav instead */
+  .sidebar { display: none !important; }
+
+  /* Full width main column */
+  .shell { flex-direction: column; }
+  .main-col { width: 100%; }
+
+  /* Sticky top bar — compact on mobile */
+  .top-bar {
+    padding: 8px 12px;
+    gap: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+  }
+  .proj-inp  { font-size: 14px !important; min-width: 100px; }
+  .meta-inp  { width: 100px; font-size: 12px !important; }
+  .status-sel{ display: none; } /* hide status on mobile to save space */
+  .complex-sel { font-size: 11px !important; padding: 6px 8px; }
+
+  /* KPI strip — horizontal scroll, no wrap */
+  .kpi-strip {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding: 6px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .kpi-strip::-webkit-scrollbar { display: none; }
+  .kpi { min-width: 72px; padding: 5px 10px; flex-shrink: 0; }
+  .kpi-val { font-size: 13px; }
+
+  /* Tab bar — horizontal scroll */
+  .tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 8px;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 9px 10px; font-size: 11px; }
+
+  /* Content area padding */
+  .content-area { padding: 14px 12px 100px; } /* bottom pad for bottom nav */
+
+  /* Auth screen */
+  .auth-card { padding: 24px 20px; margin: 0; border-radius: 8px; }
+  .auth-logo { font-size: 22px; }
+
+  /* Dashboard */
+  .db-grid { grid-template-columns: 1fr; gap: 10px; }
+  .db-kpis { gap: 4px; }
+  .db-kpi-val { font-size: 13px; }
+
+  /* Section headers */
+  .sec-hd { gap: 8px; }
+  .sec-title { font-size: 18px; }
+  .sec-acts { width: 100%; justify-content: flex-end; }
+
+  /* Rooms — single column */
+  .rooms-grid { grid-template-columns: 1fr; gap: 10px; }
+  .room-card { padding: 12px; }
+  .rooms-summ { gap: 8px; padding: 10px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .sum-item { min-width: 52px; flex-shrink: 0; }
+
+  /* Wall rows */
+  .wall-row { grid-template-columns: 1fr 64px 64px 24px; gap: 3px; }
+
+  /* Quotation table — horizontal scroll */
+  .tbl-wrap { border-radius: 6px; }
+  table { min-width: 800px; }
+  .totals-bar { grid-template-columns: repeat(3,1fr); gap: 6px; }
+  .tot-val { font-size: 16px; }
+
+  /* Trades view */
+  .trade-block { border-radius: 6px; }
+
+  /* Moodboard */
+  .mood-grid { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Gantt — horizontal scroll */
+  .gantt-wrap { border-radius: 6px; }
+
+  /* Client view */
+  .cv-hdr { padding: 16px 18px; }
+  .cv-logo-txt { font-size: 16px; }
+  .cv-info-bar { padding: 10px 18px; gap: 10px; }
+  .cv-sec { padding: 10px 18px; }
+  .cv-totals-box { padding: 12px 18px; }
+  .cv-terms { padding: 10px 18px; }
+  .cv-footer { padding: 10px 18px; font-size: 9px; }
+  .cv-tots-row { gap: 16px; }
+  .cv-tot-big { font-size: 18px; }
+  table.cv-tbl { min-width: 440px; }
+
+  /* Calculator */
+  .calc-grid { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Database panel */
+  #V-database .db-mgmt-grid,
+  div[style*="grid-template-columns:220px"] { display: flex !important; flex-direction: column !important; }
+
+  /* Settings */
+  .settings-grid { grid-template-columns: 1fr; }
+
+  /* Modal — full screen on mobile */
+  .modal-bg-inner,
+  #crud-modal-bg > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 16px 16px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+  #crud-modal-bg {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  /* Mood breakdown table scroll */
+  #mood-breakdown { overflow-x: auto; }
+  #mood-breakdown table { min-width: 400px; }
+
+  /* Form rows */
+  .form-row-2 { grid-template-columns: 1fr; gap: 0; }
+  .form-row-4 { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── BOTTOM NAV (mobile only) ── */
+#bottom-nav {
+  display: none;
+}
+@media (max-width: 768px) {
+  #bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--s1);
+    border-top: 1px solid var(--bdr);
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+  }
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px 6px;
+    font-size: 10px;
+    color: var(--txt3);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-family: var(--ff-b);
+    gap: 3px;
+    min-height: 52px;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .15s;
+  }
+  .bnav-item.active { color: var(--gold); }
+  .bnav-icon { font-size: 18px; line-height: 1; }
+  .bnav-lbl  { font-size: 10px; font-weight: 500; }
+
+  /* Floating back button in builder */
+  #mobile-back-btn {
+    display: flex;
+    position: fixed;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 12px);
+    left: 12px;
+    background: var(--s1);
+    border: 1px solid var(--bdr);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--txt2);
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.12);
+    cursor: pointer;
+    z-index: 150;
+    font-family: var(--ff-b);
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+@media (min-width: 769px) {
+  #mobile-back-btn { display: none !important; }
 }
 </style>
 </head>
@@ -645,6 +860,27 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   </div><!-- /main-col -->
 </div><!-- /S-app -->
 
+<!-- MOBILE BOTTOM NAV -->
+<nav id="bottom-nav">
+  <button class="bnav-item active" id="bnav-dashboard" onclick="mobileNavTo('dashboard')">
+    <span class="bnav-icon">◈</span><span class="bnav-lbl">Projects</span>
+  </button>
+  <button class="bnav-item" id="bnav-database" onclick="mobileNavTo('database')">
+    <span class="bnav-icon">▤</span><span class="bnav-lbl">Materials</span>
+  </button>
+  <button class="bnav-item" id="bnav-calc" onclick="mobileNavTo('calc')">
+    <span class="bnav-icon">◻</span><span class="bnav-lbl">Calculators</span>
+  </button>
+  <button class="bnav-item" id="bnav-settings" onclick="mobileNavTo('settings')">
+    <span class="bnav-icon">⚙</span><span class="bnav-lbl">Settings</span>
+  </button>
+</nav>
+
+<!-- MOBILE FLOATING BACK BUTTON (shown only inside a quotation) -->
+<button id="mobile-back-btn" onclick="navTo('dashboard')" style="display:none">
+  ← Back to Projects
+</button>
+
 <!-- TRADE / MATERIAL MODAL -->
 <div id="crud-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeModalBg(event)">
   <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.15)">
@@ -782,11 +1018,28 @@ function navTo(view){
   $('top-bar').style.display   = isBuilder?'flex':'none'
   $('kpi-strip').style.display = isBuilder?'flex':'none'
   $('tab-bar').style.display   = isBuilder?'flex':'none'
+  // Mobile back button — show only inside quotation builder
+  const mbb=$('mobile-back-btn')
+  if(mbb) mbb.style.display = isBuilder?'flex':'none'
+  // Bottom nav active state
+  const bnavMap={dashboard:'bnav-dashboard',database:'bnav-database',calc:'bnav-calc',settings:'bnav-settings'}
+  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'))
+  if(bnavMap[view]) $(bnavMap[view])?.classList.add('active')
   showView(view)
   if(view==='dashboard') loadDashboard()
   if(view==='calc')      initCalcs()
   if(view==='settings')  loadSettingsUI()
   if(view==='database')  renderDbPanel()
+}
+
+function mobileNavTo(view){
+  // Hide builder chrome when navigating away via bottom nav
+  $('top-bar').style.display   = 'none'
+  $('kpi-strip').style.display = 'none'
+  $('tab-bar').style.display   = 'none'
+  const mbb=$('mobile-back-btn')
+  if(mbb) mbb.style.display = 'none'
+  navTo(view)
 }
 
 function switchTab(tab){
