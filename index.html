@@ -656,12 +656,12 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               <th style="width:110px">Trade</th>
               <th style="width:135px">Material / Spec</th>
               <th style="width:165px">Description</th>
-              <th class="r" style="width:52px">Qty</th>
-              <th style="width:52px">Unit</th>
-              <th class="r" style="width:68px">Cost/u</th>
-              <th class="r" style="width:68px">Rate/u</th>
-              <th class="r" style="width:78px">Tot.Cost</th>
-              <th class="r" style="width:78px">Tot.Rev</th>
+              <th class="r" style="width:60px">Qty</th>
+              <th style="width:58px">Unit</th>
+              <th class="r" style="width:76px">Cost/u</th>
+              <th class="r" style="width:76px">Rate/u</th>
+              <th class="r" style="width:82px">Tot.Cost</th>
+              <th class="r" style="width:82px">Tot.Rev</th>
               <th class="r" style="width:50px">GP%</th>
               <th style="width:26px"></th>
             </tr></thead>
@@ -1770,10 +1770,10 @@ function renderItemsTable(){
       <td>${tradeSel}</td>
       <td>${matSel}</td>
       <td><input type="text"   value="${esc(item.description||'')}" oninput="updateItem('${item.id}','description',this.value)" placeholder="Description…"></td>
-      <td><input type="number" value="${item.quantity||''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:50px"></td>
+      <td class="num"><input type="number" value="${item.quantity||''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:100%;text-align:right"></td>
       <td><select onchange="updateItem('${item.id}','unit',this.value)">${unitOpts}</select></td>
-      <td><input type="number" value="${item.cost_rate||''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:62px"></td>
-      <td><input type="number" value="${item.client_rate||''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:62px;color:var(--gold)"></td>
+      <td class="num"><input type="number" value="${item.cost_rate||''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:100%;text-align:right"></td>
+      <td class="num"><input type="number" value="${item.client_rate||''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:100%;text-align:right;color:var(--gold)"></td>
       <td class="num">${fmtC0(tc)}</td>
       <td class="num" style="color:var(--gold)">${fmtC0(tr)}</td>
       <td class="${gpPct>=0?'gp-pos':'gp-neg'}">${fmtN(gpPct,1)}%</td>
