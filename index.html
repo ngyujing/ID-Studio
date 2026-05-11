@@ -1632,13 +1632,17 @@ function renderRooms(){
 // QUOTATION ITEMS
 // ═══════════════════════════════════════════════════
 async function addItem(){
-  const firstTrade=TRADES[2]||TRADES[0]
   const {data,error}=await db.from('quotation_items').insert({
     quotation_id:Q.id,
-    room_name:ROOMS[0]?.name||'',
-    trade_id:firstTrade?.id||null,
-    description:'', quantity:1,
-    unit:'sqft', cost_rate:0, client_rate:0, sort_order:ITEMS.length
+    room_name:   '',
+    trade_id:    null,
+    material_id: null,
+    description: '',
+    quantity:    null,
+    unit:        'sqft',
+    cost_rate:   null,
+    client_rate: null,
+    sort_order:  ITEMS.length
   }).select().single()
   if(error){ toast('Error adding line','err'); return }
   ITEMS.push(data); renderItemsTable(); updateKPIs()
@@ -2349,8 +2353,8 @@ function openMatModal(id){
   CRUD_MODE='material'
   const m=id?MATS.find(x=>x.id===id):null
   CRUD_DATA={id:m?.id||null,trade_id:m?.trade_id||DB_SEL_TRADE}
-  const unitOpts=['sqft','sqm','pfr','no.','l.s.','rm','lot']
-    .map(u=>`<option${u===(m?.default_unit||'sqft')?' selected':''}>${u}</option>`).join('')
+  const unitOpts=UNITS
+    .map(u=>`<option value="${u}"${u===(m?.default_unit||'sqft')?' selected':''}>${u}</option>`).join('')
   $('crud-modal-title').textContent=m?'Edit Material':'Add Material'
   $('crud-modal-body').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
