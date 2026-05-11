@@ -1660,8 +1660,15 @@ async function updateItem(id,field,rawVal){
 
   ITEMS=ITEMS.map(i=>{
     if(i.id!==id) return i
-    // Only update the single changed field — no auto-population
-    return {...i,[field]:val}
+    let upd={...i,[field]:val}
+    // When material is selected, auto-fill description only (if currently empty)
+    if(field==='material_id'){
+      const mat=MATS.find(m=>m.id===val)
+      if(mat && mat.description && !upd.description){
+        upd.description = mat.description
+      }
+    }
+    return upd
   })
 
   if(needsFullRender){
