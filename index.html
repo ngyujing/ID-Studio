@@ -1901,8 +1901,7 @@ function renderClientView(){
           <strong>QUOTATION</strong>
           Ref: ${esc(Q.ref_number)}<br>
           Date: ${date}<br>
-          Validity: 30 days<br>
-          Tier: ${cx_lbl}
+          Validity: 30 days
         </div>
       </div>
       <div class="cv-info-bar">
@@ -1911,7 +1910,6 @@ function renderClientView(){
         <div class="cv-info-blk"><div class="cv-info-lbl">Address</div><div class="cv-info-val">${esc(Q.address||'—')}</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Total Area</div><div class="cv-info-val">${fmtN(tSqm,1)} sqm / ${fmtN(tSqft,0)} sqft</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Property Type</div><div class="cv-info-val">${PROP_TYPE==='hdb'?'HDB':PROP_TYPE==='condo'?'Condo / Landed':'Commercial'}</div></div>
-        <div class="cv-info-blk"><div class="cv-info-lbl">Design Level</div><div class="cv-info-val">${cx_lbl} Package</div></div>
       </div>
       ${tradeSections}
       <div class="cv-totals-box">
