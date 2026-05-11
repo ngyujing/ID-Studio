@@ -1652,51 +1652,28 @@ async function updateItem(id,field,rawVal){
   const numFields=['quantity','cost_rate','client_rate']
   const val=numFields.includes(field)?parseFloat(rawVal)||0:rawVal
 
-  // Fields that need a full row re-render (auto-fills multiple cells)
+  // trade_id and material_id: re-render the row so the material dropdown
+  // filters to the correct trade — but no auto-filling of any other field
   const needsFullRender = field==='trade_id' || field==='material_id'
-  // Fields that affect totals/KPIs (need cell + footer updates)
   const affectsTotals   = numFields.includes(field)
-  // Fields that change NO calculations — room_name, description, unit
-  // For these we must NOT touch any DOM at all, or iOS Safari resets the select
   const calcNeutral     = !needsFullRender && !affectsTotals
 
   ITEMS=ITEMS.map(i=>{
     if(i.id!==id) return i
-    let upd={...i,[field]:val}
-    if(field==='trade_id'){
-      const mats=matsForTrade(val)
-      if(mats.length){
-        upd.material_id=mats[0].id
-        upd.cost_rate  =getRateCost(mats[0],'cost')
-        upd.client_rate=getRateCost(mats[0],'rate')
-        upd.unit       =mats[0].default_unit||'sqft'
-      }
-    }
-    if(field==='material_id'){
-      const mat=MATS.find(m=>m.id===val)
-      if(mat){
-        upd.cost_rate  =getRateCost(mat,'cost')
-        upd.client_rate=getRateCost(mat,'rate')
-        upd.unit       =mat.default_unit||'sqft'
-        if(!upd.description) upd.description=mat.description||''
-      }
-    }
-    return upd
+    // Only update the single changed field — no auto-population
+    return {...i,[field]:val}
   })
 
   if(needsFullRender){
-    // Trade/material: full row re-render needed (multiple auto-filled fields)
     renderItemsTable()
     updateKPIs()
   } else if(affectsTotals){
-    // Qty/cost/rate: update only the 3 computed read-only cells + totals
     updateItemRowCells(id)
     updateItemsFooter()
     renderTotalsBar()
     updateKPIs()
   }
-  // calcNeutral (room_name, description, unit): state updated above, zero DOM changes
-  // This is the fix — touching tfoot or any table DOM while iOS select is open resets it
+  // calcNeutral (room_name, description, unit): zero DOM changes to avoid iOS select reset
 
   debounce('item_'+id, async()=>{
     const item=ITEMS.find(i=>i.id===id)
@@ -1756,10 +1733,10 @@ function renderItemsTable(){
     const tc=(item.cost_rate||0)*(item.quantity||0)
     const tr=(item.client_rate||0)*(item.quantity||0)*cx
     const gpPct=tr>0?(tr-tc)/tr*100:0
-    const trMats=matsForTrade(item.trade_id)
+    const trMats = item.trade_id ? matsForTrade(item.trade_id) : MATS
     const roomOpts=[{v:'',l:'— Room —'},...ROOMS.map(r=>({v:r.name,l:r.name}))]
     const tradeOpts=[{v:'',l:'— Trade —'},...TRADES.map(t=>({v:t.id,l:t.name}))]
-    const matOpts=[{v:'',l:'— Material —'},...trMats.map(m=>({v:m.id,l:m.name}))]
+    const matOpts=[{v:'',l:'— Material / Spec —'},...trMats.map(m=>({v:m.id,l:m.name}))]
     const unitOpts=UNITS.map(u=>`<option value="${u}"${u===item.unit?' selected':''}>${u}</option>`).join('')
     const roomSel  = srchDrop(roomOpts,  item.room_name,   item.id, 'room_name',   'Search room…')
     const tradeSel = srchDrop(tradeOpts, item.trade_id,    item.id, 'trade_id',    'Search trade…')
