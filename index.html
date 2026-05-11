@@ -1545,7 +1545,14 @@ async function addItem(){
 async function updateItem(id,field,rawVal){
   const numFields=['quantity','cost_rate','client_rate']
   const val=numFields.includes(field)?parseFloat(rawVal)||0:rawVal
-  const needsFullRender=field==='trade_id'||field==='material_id'
+
+  // Fields that need a full row re-render (auto-fills multiple cells)
+  const needsFullRender = field==='trade_id' || field==='material_id'
+  // Fields that affect totals/KPIs (need cell + footer updates)
+  const affectsTotals   = numFields.includes(field)
+  // Fields that change NO calculations — room_name, description, unit
+  // For these we must NOT touch any DOM at all, or iOS Safari resets the select
+  const calcNeutral     = !needsFullRender && !affectsTotals
 
   ITEMS=ITEMS.map(i=>{
     if(i.id!==id) return i
@@ -1572,15 +1579,18 @@ async function updateItem(id,field,rawVal){
   })
 
   if(needsFullRender){
-    // Trade/material changes alter multiple fields — must re-render the whole row
+    // Trade/material: full row re-render needed (multiple auto-filled fields)
     renderItemsTable()
-  } else {
-    // Simple text/number change — update only the computed cells, keep focus
+    updateKPIs()
+  } else if(affectsTotals){
+    // Qty/cost/rate: update only the 3 computed read-only cells + totals
     updateItemRowCells(id)
     updateItemsFooter()
     renderTotalsBar()
+    updateKPIs()
   }
-  updateKPIs()
+  // calcNeutral (room_name, description, unit): state updated above, zero DOM changes
+  // This is the fix — touching tfoot or any table DOM while iOS select is open resets it
 
   debounce('item_'+id, async()=>{
     const item=ITEMS.find(i=>i.id===id)
@@ -1641,10 +1651,10 @@ function renderItemsTable(){
     const tr=(item.client_rate||0)*(item.quantity||0)*cx
     const gpPct=tr>0?(tr-tc)/tr*100:0
     const trMats=matsForTrade(item.trade_id)
-    const roomOpts=ROOMS.map(r=>`<option${r.name===item.room_name?' selected':''}>${esc(r.name)}</option>`).join('')
+    const roomOpts=ROOMS.map(r=>`<option value="${esc(r.name)}"${r.name===item.room_name?' selected':''}>${esc(r.name)}</option>`).join('')
     const tradeOpts=TRADES.map(t=>`<option value="${t.id}"${t.id===item.trade_id?' selected':''}>${esc(t.name)}</option>`).join('')
     const matOpts=trMats.map(m=>`<option value="${m.id}"${m.id===item.material_id?' selected':''}>${esc(m.name)}</option>`).join('')
-    const unitOpts=UNITS.map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')
+    const unitOpts=UNITS.map(u=>`<option value="${u}"${u===item.unit?' selected':''}>${u}</option>`).join('')
     return `<tr data-iid="${item.id}">
       <td style="text-align:center;color:var(--txt3)">${idx+1}</td>
       <td><select onchange="updateItem('${item.id}','room_name',this.value)"><option value="">—</option>${roomOpts}</select></td>
