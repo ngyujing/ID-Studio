@@ -1298,7 +1298,23 @@ async function openQuote(id){
     db.from('quotation_rooms').select('*').eq('quotation_id',id).order('sort_order'),
     db.from('quotation_items').select('*').eq('quotation_id',id).order('sort_order'),
   ])
-  Q=q; ROOMS=(r||[]).map(row=>({...row, walls: Array.isArray(row.walls_json)?row.walls_json:[]})); ITEMS=i||[]
+  Q=q
+  ROOMS=(r||[]).map(row=>({...row, walls: Array.isArray(row.walls_json)?row.walls_json:[]}))
+  // Back-fill rates from material DB for any item where cost_rate is null
+  // (items added before auto-populate was introduced, or saved without rates)
+  ITEMS=(i||[]).map(item=>{
+    if(item.cost_rate!=null && item.client_rate!=null) return item
+    if(!item.material_id) return item
+    const mat=MATS.find(m=>m.id===item.material_id)
+    if(!mat) return item
+    return {
+      ...item,
+      cost_rate:   item.cost_rate   != null ? item.cost_rate   : getRateCost(mat,'cost'),
+      client_rate: item.client_rate != null ? item.client_rate : getRateCost(mat,'rate'),
+      unit:        item.unit || mat.default_unit || 'sqft',
+      description: item.description || mat.description || '',
+    }
+  })
   // Populate header fields
   setV('inp-proj',  Q.project_name)
   setV('inp-client',Q.client_name)
@@ -1310,6 +1326,19 @@ async function openQuote(id){
   renderRooms()
   updateKPIs()
   CUR_TAB='rooms'
+  // Silently persist any back-filled rates to DB
+  const backfilled = ITEMS.filter(item=>{
+    const orig=(i||[]).find(x=>x.id===item.id)
+    return orig && (orig.cost_rate==null||orig.client_rate==null) && item.material_id
+  })
+  if(backfilled.length){
+    backfilled.forEach(item=>{
+      db.from('quotation_items').update({
+        cost_rate:item.cost_rate, client_rate:item.client_rate,
+        unit:item.unit, description:item.description
+      }).eq('id',item.id)
+    })
+  }
 }
 
 async function delQuote(id){
