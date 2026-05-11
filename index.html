@@ -567,6 +567,11 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <input class="proj-inp"   id="inp-proj"   placeholder="Project Name"  oninput="hdrChange('project_name',this.value)">
       <input class="meta-inp"   id="inp-client" placeholder="Client Name"   oninput="hdrChange('client_name',this.value)">
       <input class="meta-inp"   id="inp-addr"   placeholder="Address"       oninput="hdrChange('address',this.value)" style="width:160px">
+      <select class="status-sel" id="sel-prop-type" onchange="setPropType(this.value)" style="background:var(--s3);border:1px solid var(--bdr2);color:var(--txt);font-weight:600;font-size:11px;padding:5px 8px;width:auto;border-radius:5px">
+        <option value="hdb">HDB</option>
+        <option value="condo">Condo</option>
+        <option value="commercial">Commercial</option>
+      </select>
       <select class="status-sel" id="sel-status" onchange="hdrChange('status',this.value)">
         <option value="draft">Draft</option>
         <option value="sent">Sent</option>
@@ -723,10 +728,11 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               <button class="btn-primary" id="db-btn-add-mat" style="display:none;padding:5px 12px;font-size:11px" onclick="openMatModal(null)">+ Add Material</button>
             </div>
             <!-- Column headers -->
-            <div id="db-mat-header" style="display:none;background:var(--s2);border-bottom:1px solid var(--bdr);padding:6px 10px;display:grid;grid-template-columns:1fr 52px 72px 72px 72px 72px 64px;gap:4px;font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">
+            <div id="db-mat-header" style="display:none;background:var(--s2);border-bottom:1px solid var(--bdr);padding:6px 10px;display:grid;grid-template-columns:1fr 52px 64px 64px 64px 64px 68px 68px 64px;gap:4px;font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">
               <div>Name</div><div>Unit</div>
               <div style="text-align:right">HDB Cost</div><div style="text-align:right">HDB Rate</div>
               <div style="text-align:right">Condo Cost</div><div style="text-align:right">Condo Rate</div>
+              <div style="text-align:right">Comm. Cost</div><div style="text-align:right">Comm. Rate</div>
               <div></div>
             </div>
             <div id="db-mats-list">
@@ -947,6 +953,7 @@ const CX_LABELS     = {'1.0':'Basic','1.3':'Premium','1.6':'Luxury'}
 // ── STATE ────────────────────────────────────────────
 let USER=null, PROFILE=null, TRADES=[], MATS=[]
 let QUOTES=[], Q=null, ROOMS=[], ITEMS=[]
+let PROP_TYPE='hdb'   // 'hdb' | 'condo' | 'commercial' — active for current quotation
 let TIMERS={}, CUR_TAB='rooms'
 
 // ── HELPERS ──────────────────────────────────────────
@@ -960,6 +967,14 @@ const setV  = (id,v) => { const e=$(id); if(e&&v!=null)e.value=v }
 const genRef= () => { const d=new Date(); return `${String(d.getFullYear()).slice(2)}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*99)+1).padStart(2,'0')}` }
 const getArea = r => { const a=(r.length||0)*(r.width||0); return r.unit==='m'?{sqm:+a.toFixed(2),sqft:+(a*SQM_TO_SQFT).toFixed(1)}:{sqft:+a.toFixed(1),sqm:+(a/SQM_TO_SQFT).toFixed(2)} }
 const matsForTrade = tid => MATS.filter(m=>m.trade_id===tid)
+
+// Pick cost or rate field for the active property type
+function getRateCost(mat, costOrRate){
+  const s = costOrRate==='cost' ? 'cost' : 'rate'
+  if(PROP_TYPE==='condo')      return mat[s+'_condo']      || 0
+  if(PROP_TYPE==='commercial') return mat[s+'_commercial'] || 0
+  return mat[s+'_hdb'] || 0
+}
 const calcTotals = () => {
   const cx=Q?.complexity||1.0; let cost=0,rev=0
   ITEMS.forEach(i=>{ cost+=(i.cost_rate||0)*(i.quantity||0); rev+=(i.client_rate||0)*(i.quantity||0)*cx })
@@ -1230,6 +1245,8 @@ async function openQuote(id){
   setV('inp-addr',  Q.address)
   setV('sel-status',Q.status)
   setV('sel-cx',    Q.complexity?.toFixed(1)||'1.3')
+  PROP_TYPE = Q.prop_type || 'hdb'
+  setV('sel-prop-type', PROP_TYPE)
   renderRooms()
   updateKPIs()
   CUR_TAB='rooms'
@@ -1275,6 +1292,17 @@ function showSaved(ok){
   const e=$('saved-ind')
   if(ok){ e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),2000) }
   else   e.classList.remove('show')
+}
+
+function setPropType(type){
+  PROP_TYPE=type
+  if(Q){
+    debounce('prop_type', async()=>{
+      await db.from('quotations').update({prop_type:type}).eq('id',Q.id)
+    })
+  }
+  if(CUR_TAB==='items') renderItemsTable()
+  toast(`Switched to ${type==='hdb'?'HDB':type==='condo'?'Condo / Landed':'Commercial'} rates`)
 }
 
 async function setComplexity(v){
@@ -1526,16 +1554,16 @@ async function updateItem(id,field,rawVal){
       const mats=matsForTrade(val)
       if(mats.length){
         upd.material_id=mats[0].id
-        upd.cost_rate  =mats[0].cost_hdb||0
-        upd.client_rate=mats[0].rate_hdb||0
+        upd.cost_rate  =getRateCost(mats[0],'cost')
+        upd.client_rate=getRateCost(mats[0],'rate')
         upd.unit       =mats[0].default_unit||'sqft'
       }
     }
     if(field==='material_id'){
       const mat=MATS.find(m=>m.id===val)
       if(mat){
-        upd.cost_rate  =mat.cost_hdb||0
-        upd.client_rate=mat.rate_hdb||0
+        upd.cost_rate  =getRateCost(mat,'cost')
+        upd.client_rate=getRateCost(mat,'rate')
         upd.unit       =mat.default_unit||'sqft'
         if(!upd.description) upd.description=mat.description||''
       }
@@ -1872,6 +1900,7 @@ function renderClientView(){
         <div class="cv-info-blk"><div class="cv-info-lbl">Project</div><div class="cv-info-val">${esc(Q.project_name||'—')}</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Address</div><div class="cv-info-val">${esc(Q.address||'—')}</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Total Area</div><div class="cv-info-val">${fmtN(tSqm,1)} sqm / ${fmtN(tSqft,0)} sqft</div></div>
+        <div class="cv-info-blk"><div class="cv-info-lbl">Property Type</div><div class="cv-info-val">${PROP_TYPE==='hdb'?'HDB':PROP_TYPE==='condo'?'Condo / Landed':'Commercial'}</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Design Level</div><div class="cv-info-val">${cx_lbl} Package</div></div>
       </div>
       ${tradeSections}
@@ -2042,7 +2071,7 @@ function renderDbMats(tradeId){
     return
   }
   el.innerHTML=mats.map(m=>`
-    <div style="display:grid;grid-template-columns:1fr 52px 72px 72px 72px 72px 64px;gap:4px;
+    <div style="display:grid;grid-template-columns:1fr 52px 64px 64px 64px 64px 68px 68px 64px;gap:4px;
                 align-items:center;padding:7px 10px;border-bottom:1px solid var(--bdr);font-size:11px">
       <div>
         <div style="font-weight:500;color:var(--txt)">${esc(m.name)}</div>
@@ -2053,6 +2082,8 @@ function renderDbMats(tradeId){
       <div style="text-align:right;color:var(--gold);font-weight:500">${fmtC(m.rate_hdb||0)}</div>
       <div style="text-align:right">${fmtC(m.cost_condo||0)}</div>
       <div style="text-align:right;color:var(--gold);font-weight:500">${fmtC(m.rate_condo||0)}</div>
+      <div style="text-align:right">${fmtC(m.cost_commercial||0)}</div>
+      <div style="text-align:right;color:var(--gold);font-weight:500">${fmtC(m.rate_commercial||0)}</div>
       <div style="display:flex;gap:4px;justify-content:flex-end">
         <button style="background:transparent;color:var(--blu);border:1px solid var(--blu);padding:3px 6px;font-size:9px;border-radius:4px;cursor:pointer"
           onclick="openMatModal('${m.id}')">✎</button>
@@ -2153,7 +2184,7 @@ function openMatModal(id){
         </div>
       </div>
     </div>
-    <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:12px">
+    <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:12px;margin-bottom:10px">
       <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Condo / Landed Rates (S$ per unit)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div style="display:flex;flex-direction:column;gap:5px">
@@ -2165,6 +2196,20 @@ function openMatModal(id){
           <input id="cm-mat-rc" type="number" step="0.01" min="0" value="${m?.rate_condo||0}">
         </div>
       </div>
+    </div>
+    <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Commercial Rates (S$ per unit)</div>
+      <div style="font-size:10px;color:var(--txt3);margin-bottom:8px">E.g. shophouses, offices, F&amp;B, retail. Typically higher due to stricter requirements &amp; longer hours.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Contractor Cost</label>
+          <input id="cm-mat-cx" type="number" step="0.01" min="0" value="${m?.cost_commercial||0}">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Client Rate</label>
+          <input id="cm-mat-rx" type="number" step="0.01" min="0" value="${m?.rate_commercial||0}">
+        </div>
+      </div>
     </div>`
   $('crud-modal-bg').style.display='flex'
   setTimeout(()=>$('cm-mat-name')?.focus(),80)
@@ -2174,14 +2219,16 @@ async function saveMaterial(){
   const name=$('cm-mat-name').value.trim()
   if(!name){toast('Material name is required','err');return}
   const payload={
-    trade_id:    CRUD_DATA.trade_id,
+    trade_id:        CRUD_DATA.trade_id,
     name,
-    description: $('cm-mat-desc').value.trim(),
-    default_unit:$('cm-mat-unit').value,
-    cost_hdb:    parseFloat($('cm-mat-ch').value)||0,
-    rate_hdb:    parseFloat($('cm-mat-rh').value)||0,
-    cost_condo:  parseFloat($('cm-mat-cc').value)||0,
-    rate_condo:  parseFloat($('cm-mat-rc').value)||0,
+    description:     $('cm-mat-desc').value.trim(),
+    default_unit:    $('cm-mat-unit').value,
+    cost_hdb:        parseFloat($('cm-mat-ch').value)||0,
+    rate_hdb:        parseFloat($('cm-mat-rh').value)||0,
+    cost_condo:      parseFloat($('cm-mat-cc').value)||0,
+    rate_condo:      parseFloat($('cm-mat-rc').value)||0,
+    cost_commercial: parseFloat($('cm-mat-cx').value)||0,
+    rate_commercial: parseFloat($('cm-mat-rx').value)||0,
   }
   const btn=$('crud-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>'
   let error
