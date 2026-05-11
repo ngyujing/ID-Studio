@@ -1638,7 +1638,7 @@ async function addItem(){
     trade_id:    null,
     material_id: null,
     description: '',
-    quantity:    null,
+    quantity:    1,
     unit:        'sqft',
     cost_rate:   null,
     client_rate: null,
@@ -1661,11 +1661,15 @@ async function updateItem(id,field,rawVal){
   ITEMS=ITEMS.map(i=>{
     if(i.id!==id) return i
     let upd={...i,[field]:val}
-    // When material is selected, auto-fill description only (if currently empty)
+    // When material is selected, auto-fill description, unit, cost and rate from DB
     if(field==='material_id'){
       const mat=MATS.find(m=>m.id===val)
-      if(mat && mat.description && !upd.description){
-        upd.description = mat.description
+      if(mat){
+        upd.description  = mat.description  || upd.description || ''
+        upd.default_unit = mat.default_unit  || 'sqft'
+        upd.unit         = mat.default_unit  || 'sqft'
+        upd.cost_rate    = getRateCost(mat,'cost')
+        upd.client_rate  = getRateCost(mat,'rate')
       }
     }
     return upd
