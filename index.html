@@ -1758,10 +1758,10 @@ function renderItemsTable(){
       <td>${tradeSel}</td>
       <td>${matSel}</td>
       <td><input type="text"   value="${esc(item.description||'')}" oninput="updateItem('${item.id}','description',this.value)" placeholder="Description…"></td>
-      <td class="num"><input type="number" value="${item.quantity||''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:100%;text-align:right"></td>
+      <td class="num"><input type="number" value="${item.quantity!=null?item.quantity:''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:100%;text-align:right"></td>
       <td><select onchange="updateItem('${item.id}','unit',this.value)">${unitOpts}</select></td>
-      <td class="num"><input type="number" value="${item.cost_rate||''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:100%;text-align:right"></td>
-      <td class="num"><input type="number" value="${item.client_rate||''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:100%;text-align:right;color:var(--gold)"></td>
+      <td class="num"><input type="number" value="${item.cost_rate!=null?item.cost_rate:''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:100%;text-align:right"></td>
+      <td class="num"><input type="number" value="${item.client_rate!=null?item.client_rate:''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:100%;text-align:right;color:var(--gold)"></td>
       <td class="num">${fmtC0(tc)}</td>
       <td class="num" style="color:var(--gold)">${fmtC0(tr)}</td>
       <td class="${gpPct>=0?'gp-pos':'gp-neg'}">${fmtN(gpPct,1)}%</td>
@@ -1851,7 +1851,7 @@ function renderTrades(){
             <td>${esc(i.description||'—')}</td>
             <td class="r">${fmtN(i.quantity,1)}</td>
             <td class="r">${i.unit}</td>
-            <td class="r">${fmtC(i.cost_rate)}</td>
+            <td class="r">${fmtC(i.cost_rate||0)}</td>
             <td class="r">${fmtC((i.cost_rate||0)*(i.quantity||0))}</td>
           </tr>`}).join('')}</tbody>
         <tfoot><tr>
