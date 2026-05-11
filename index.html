@@ -494,6 +494,16 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 @media (min-width: 769px) {
   #mobile-back-btn { display: none !important; }
 }
+/* Searchable dropdown */
+.srch-wrap{position:relative;width:100%;min-width:0}
+.srch-inp{width:100%;padding:3px 6px;font-size:11px;background:var(--s1);border:1px solid var(--bdr);border-radius:4px;color:var(--txt);font-family:var(--ff-b)}
+.srch-inp:focus{border-color:var(--gold);outline:none}
+.srch-list{position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--gold);border-radius:4px;z-index:300;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none}
+.srch-list.open{display:block}
+.srch-opt{padding:6px 8px;font-size:11px;cursor:pointer;color:var(--txt);border-bottom:1px solid var(--bdr2)}
+.srch-opt:last-child{border-bottom:none}
+.srch-opt:hover,.srch-opt.hi{background:var(--s3);color:var(--gold)}
+.srch-empty{padding:8px;font-size:11px;color:var(--txt3);text-align:center}
 </style>
 </head>
 <body>
@@ -922,7 +932,57 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 // ── CONSTANTS ────────────────────────────────────────
 const SQM_TO_SQFT = 10.764
-const UNITS = ['sqft','sqm','pfr','no.','l.s.','rm','lot']
+const UNITS = ['sqft','sqm','ft','mtr','L','no.','Room','Lot','Set','pcs','Lump']
+
+const TRADE_ORDER = [
+  'Professional Services','Preliminary & Post Works','Hacking & Demolition Works',
+  'Masonry & Tiling Works','Floor Works','Carpentry Works','Plumbing Works',
+  'Painting Works','Door Works','Glass / Mirror Works','Electrical Works',
+]
+
+const TRADE_DISCLAIMERS = {
+  'Hacking & Demolition Works': [
+    'Hacking permit requires 1–2 weeks processing time from HDB. If a PE is required, processing will take longer.',
+    'No guarantee is provided for damages to concealed piping within walls or floors during demolition, as the piping layout and building conditions are unknown.',
+    'Tile hacking includes only a single-layer removal. Additional charges apply for multiple overlay surfaces.',
+    'Removing window grills leaves unrepaired screw holes. Requesting a hole stamp from the supplier will incur an additional cost.',
+  ],
+  'Masonry & Tiling Works': [
+    'The base price covers the standard laying pattern of 600mm × 600mm / 600mm × 300mm / 300mm × 300mm and tiles up to S$4.00/sqft after GST; selections above this amount will be charged as a top-up.',
+    'Any deviations from the standard pattern, the use of different materials (e.g. mosaic tiles), or dimensions that differ from standard size will incur additional charges.',
+    'The actual appearance of tiles may vary from samples due to batch, colour variations (running tone/pattern), and lighting conditions. These factors may also affect the final site appearance and alignment of tile connections.',
+    'Joints finishing: Price includes 45-degree mitred edge joints.',
+  ],
+  'Carpentry Works': [
+    'Indicated price includes the following standard finishings for all carpentry works unless stated otherwise: (A) Solid plywood finish, featuring ABS edging on side edges of the doors. (B) External surfaces come with high-pressure laminates (4ft × 8ft sheets), with a price cap of S$60/piece. (C) Usage of BLUM brand soft-closing hinges and drawer tracks. (D) Internal surfaces come with colour PVC. (E) 3 drawers per 6ft of full-height carpentry.',
+    'All full-height carpentry is priced up to dimensions: Height 2600mm × Depth 600mm unless otherwise stated. Full-height carpentry includes full-height wardrobes, top & bottom cabinets, tall units, and full-height shoe cabinets.',
+    'All low-height carpentry is priced up to dimensions: Height 1300mm × Depth 600mm. Low-height carpentry includes benches, TV console, half-height cabinets, vanity, and built-in study table.',
+  ],
+  'Plumbing Works': [
+    'There is no assurance or warranty provided for wall and floor finishes during the process of disassembly, drilling, and installation.',
+    'For package pricing, both toilets should be back-to-back or adjacent. Additional charges will apply if extension piping is required for distant layouts.',
+  ],
+  'Painting Works': [
+    'Smooth finish is quoted separately under plastering works, if required (recommended for resale or re-wiring properties).',
+    'We recommend applying an oil sealer before painting to create a protective layer that improves paint adhesion, durability, and resistance to moisture and wear.',
+    'For glossy paint, please note that multiple touch-ups may result in uneven patches on the wall.',
+    'For limewash, the application must be completed on the final trip before handover, as touch-ups are not possible.',
+    'Painting includes up to 4 colours, with Matex white paint for all ceilings.',
+  ],
+  'Door Works': [
+    'Main door change requires paperwork submission. If the property mandates a fire-rated door, it must be followed.',
+  ],
+  'Glass / Mirror Works': [
+    'Glass panels are limited by lift capacity and delivery constraints. Oversized panels require staircase transport at an additional cost.',
+    'Glass joints will apply if size limits are exceeded. For special cuts, consult the designer; otherwise, standard cutting placement will be applied.',
+  ],
+  'Electrical Works': [
+    'Light fittings are reimbursed at cost plus a S$50 service fee for each round of purchase to cover transport and potential returns.',
+  ],
+}
+
+const roundUp10  = n => Math.ceil(n / 10) * 10
+const withBuffer = n => roundUp10(n * 1.1)
 const MOOD = {
   '1.0':{ label:'Basic',   color:'#5A9E75',
     feats:['Standard laminate finishes','Emulsion paint (2 colours)','Vinyl or homogeneous tile flooring','Standard electrical & plumbing','Off-the-shelf hardware & fittings'],
@@ -1431,23 +1491,33 @@ function updateRoomsSummary(){
   const summ=$('rooms-summ')
   if(!ROOMS.length){ summ.style.display='none'; return }
   summ.style.display='flex'
-  const tFSqm =ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
   const tFSqft=ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
-  const tWSqm =ROOMS.reduce((s,r)=>s+getWallArea(r).sqm,0)
   const tWSqft=ROOMS.reduce((s,r)=>s+getWallArea(r).sqft,0)
+  const tFBuf =withBuffer(tFSqft)
+  const tWBuf =withBuffer(tWSqft)
   summ.innerHTML=`
     <div class="sum-item"><div class="sum-val">${ROOMS.length}</div><div class="sum-lbl">Rooms</div></div>
     <div class="vdiv"></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tFSqm,1)}</div><div class="sum-lbl">Floor sqm</div></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tFSqft,0)}</div><div class="sum-lbl">Floor sqft</div></div>
+    <div class="sum-item">
+      <div class="sum-val">${fmtN(tFSqft,0)}</div>
+      <div class="sum-lbl">Floor sqft</div>
+      <div style="font-size:9px;color:var(--grn);margin-top:2px">+10%: ${tFBuf}</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-val">${fmtN(tWSqft,0)}</div>
+      <div class="sum-lbl">Wall sqft</div>
+      <div style="font-size:9px;color:var(--grn);margin-top:2px">+10%: ${tWBuf}</div>
+    </div>
     <div class="vdiv"></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tWSqm,1)}</div><div class="sum-lbl">Wall sqm</div></div>
-    <div class="sum-item"><div class="sum-val">${fmtN(tWSqft,0)}</div><div class="sum-lbl">Wall sqft</div></div>
-    <div class="vdiv"></div>
-    ${ROOMS.map(r=>`<div class="sum-item">
-      <div class="sum-val" style="font-size:14px">${fmtN(getArea(r).sqm,1)}</div>
-      <div class="sum-lbl">${esc(r.name)}</div>
-    </div>`).join('')}
+    ${ROOMS.map(r=>{
+      const fa=getArea(r)
+      const wa=getWallArea(r)
+      return `<div class="sum-item">
+        <div class="sum-val" style="font-size:14px">${fmtN(fa.sqft,0)}</div>
+        <div class="sum-lbl">${esc(r.name)}</div>
+        ${wa.sqft>0?`<div style="font-size:9px;color:var(--txt3);margin-top:1px">Wall: ${fmtN(wa.sqft,0)} sqft</div>`:''}
+      </div>`
+    }).join('')}
   `
 }
 
@@ -1469,29 +1539,52 @@ function renderRooms(){
     const wa=getWallArea(r)
     const walls=r.walls||[]
     const unitLbl=r.unit==='m'?'m':'ft'
+
+    // Per-wall area rows
     const wallHdr = walls.length?`
-      <div class="wall-col-hdr">
+      <div class="wall-col-hdr" style="grid-template-columns:1fr 64px 64px 24px">
         <div class="wall-col-lbl">Wall Name</div>
         <div class="wall-col-lbl" style="text-align:right">L (${unitLbl})</div>
         <div class="wall-col-lbl" style="text-align:right">H (m)</div>
         <div></div>
       </div>`:''
-    const wallRows=walls.map((w,i)=>`
-      <div class="wall-row">
-        <input type="text"   value="${esc(w.name||'')}"   oninput="updateWall('${r.id}',${i},'name',this.value)"   placeholder="e.g. North wall">
-        <input type="number" value="${w.length||''}" step="0.1" min="0" oninput="updateWall('${r.id}',${i},'length',this.value)" placeholder="L" style="text-align:right">
-        <input type="number" value="${w.height||''}" step="0.1" min="0" oninput="updateWall('${r.id}',${i},'height',this.value)" placeholder="H" style="text-align:right">
-        <button class="btn-del" style="padding:2px 5px" onclick="removeWall('${r.id}',${i})">✕</button>
-      </div>`).join('')
+
+    const wallRows=walls.map((w,i)=>{
+      // per-wall area calc
+      const l=parseFloat(w.length)||0, h=parseFloat(w.height)||0
+      const wallSqm = r.unit==='m' ? l*h : (l/3.281)*h
+      const wallSqft = +(wallSqm*SQM_TO_SQFT).toFixed(1)
+      return `
+      <div style="margin-bottom:6px">
+        <div class="wall-row" style="grid-template-columns:1fr 64px 64px 24px">
+          <input type="text"   value="${esc(w.name||'')}"  oninput="updateWall('${r.id}',${i},'name',this.value)"   placeholder="e.g. North wall">
+          <input type="number" value="${w.length||''}" step="0.1" min="0" oninput="updateWall('${r.id}',${i},'length',this.value)" placeholder="L" style="text-align:right">
+          <input type="number" value="${w.height||''}" step="0.1" min="0" oninput="updateWall('${r.id}',${i},'height',this.value)" placeholder="H" style="text-align:right">
+          <button class="btn-del" style="padding:2px 5px" onclick="removeWall('${r.id}',${i})">✕</button>
+        </div>
+        ${l&&h?`<div style="font-size:10px;color:var(--txt3);text-align:right;padding:2px 28px 0 0">
+          ${esc(w.name||'Wall')} area: <strong style="color:var(--gold2)">${wallSqft} sqft</strong> (${wallSqm.toFixed(2)} sqm)
+        </div>`:''}
+      </div>`
+    }).join('')
+
+    const wallTotalSqft = wa.sqft
+    const wallBufSqft   = withBuffer(wallTotalSqft)
     const wallTotal=walls.length?`
-      <div class="wall-total-row">
-        <span class="wall-total-lbl">Total wall area</span>
-        <div style="display:flex;align-items:baseline;gap:10px">
-          <span class="wall-sqm wall-total-val">${fmtN(wa.sqm,2)} sqm</span>
-          <span style="font-size:10px;color:var(--txt3)">|</span>
-          <span class="wall-sqft wall-total-val" style="font-size:12px;color:var(--txt2)">${fmtN(wa.sqft,1)} sqft</span>
+      <div class="wall-total-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+          <span class="wall-total-lbl">Actual wall area</span>
+          <span class="wall-sqft wall-total-val">${fmtN(wallTotalSqft,1)} sqft</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+          <span style="font-size:10px;color:var(--txt3)">+10% buffer (rounded up to nearest 10)</span>
+          <span style="font-family:var(--ff-h);font-size:14px;color:var(--grn);font-weight:600">${wallBufSqft} sqft</span>
         </div>
       </div>`:''
+
+    const floorSqft    = fa.sqft
+    const floorBufSqft = withBuffer(floorSqft)
+
     return `<div class="room-card" data-rid="${r.id}">
       <div class="room-hd">
         <input class="room-name-inp" value="${esc(r.name)}" oninput="updateRoom('${r.id}','name',this.value)" placeholder="Room name">
@@ -1506,14 +1599,23 @@ function renderRooms(){
           <option value="ft" ${r.unit==='ft'?'selected':''}>ft</option>
         </select>
       </div>
-      <div class="area-badge">
-        <div><div class="area-num floor-area-num">${fmtN(fa.sqm,2)}</div><div class="area-unit">sqm</div></div>
-        <div class="area-div"></div>
-        <div><div class="area-num floor-area-num">${fmtN(fa.sqft,1)}</div><div class="area-unit">sqft</div></div>
+      <div class="area-badge" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:10px;color:var(--txt3)">Actual floor area</div>
+          <div style="display:flex;gap:10px;align-items:baseline">
+            <div><span class="area-num floor-area-num">${fmtN(fa.sqm,2)}</span><span class="area-unit"> sqm</span></div>
+            <div style="width:1px;height:14px;background:var(--bdr)"></div>
+            <div><span class="area-num floor-area-num">${fmtN(floorSqft,1)}</span><span class="area-unit"> sqft</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px dashed var(--bdr2)">
+          <div style="font-size:10px;color:var(--txt3)">+10% buffer (↑ nearest 10)</div>
+          <div style="font-family:var(--ff-h);font-size:15px;color:var(--grn);font-weight:600">${floorBufSqft} sqft</div>
+        </div>
       </div>
       <div class="walls-section">
         <div class="walls-hd">
-          <span class="walls-lbl">Walls <span style="font-weight:400;text-transform:none;letter-spacing:0">(tiles &amp; paint area)</span></span>
+          <span class="walls-lbl">Walls <span style="font-weight:400;text-transform:none;letter-spacing:0">(tiles &amp; paint)</span></span>
           <button class="btn-add-wall" onclick="addWall('${r.id}')">+ Add Wall</button>
         </div>
         ${wallHdr}
@@ -1651,22 +1753,25 @@ function renderItemsTable(){
     const tr=(item.client_rate||0)*(item.quantity||0)*cx
     const gpPct=tr>0?(tr-tc)/tr*100:0
     const trMats=matsForTrade(item.trade_id)
-    const roomOpts=ROOMS.map(r=>`<option value="${esc(r.name)}"${r.name===item.room_name?' selected':''}>${esc(r.name)}</option>`).join('')
-    const tradeOpts=TRADES.map(t=>`<option value="${t.id}"${t.id===item.trade_id?' selected':''}>${esc(t.name)}</option>`).join('')
-    const matOpts=trMats.map(m=>`<option value="${m.id}"${m.id===item.material_id?' selected':''}>${esc(m.name)}</option>`).join('')
+    const roomOpts=[{v:'',l:'— Room —'},...ROOMS.map(r=>({v:r.name,l:r.name}))]
+    const tradeOpts=[{v:'',l:'— Trade —'},...TRADES.map(t=>({v:t.id,l:t.name}))]
+    const matOpts=[{v:'',l:'— Material —'},...trMats.map(m=>({v:m.id,l:m.name}))]
     const unitOpts=UNITS.map(u=>`<option value="${u}"${u===item.unit?' selected':''}>${u}</option>`).join('')
+    const roomSel  = srchDrop(roomOpts,  item.room_name,   item.id, 'room_name',   'Search room…')
+    const tradeSel = srchDrop(tradeOpts, item.trade_id,    item.id, 'trade_id',    'Search trade…')
+    const matSel   = srchDrop(matOpts,   item.material_id, item.id, 'material_id', 'Search material…')
     return `<tr data-iid="${item.id}">
       <td style="text-align:center;color:var(--txt3)">${idx+1}</td>
-      <td><select onchange="updateItem('${item.id}','room_name',this.value)"><option value="">—</option>${roomOpts}</select></td>
-      <td><select onchange="updateItem('${item.id}','trade_id',this.value)"><option value="">—</option>${tradeOpts}</select></td>
-      <td><select onchange="updateItem('${item.id}','material_id',this.value)"><option value="">—</option>${matOpts}</select></td>
+      <td>${roomSel}</td>
+      <td>${tradeSel}</td>
+      <td>${matSel}</td>
       <td><input type="text"   value="${esc(item.description||'')}" oninput="updateItem('${item.id}','description',this.value)" placeholder="Description…"></td>
       <td><input type="number" value="${item.quantity||''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:50px"></td>
       <td><select onchange="updateItem('${item.id}','unit',this.value)">${unitOpts}</select></td>
       <td><input type="number" value="${item.cost_rate||''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:62px"></td>
-      <td><input type="number" value="${item.client_rate||''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:62px;color:var(--gold2)"></td>
+      <td><input type="number" value="${item.client_rate||''}" min="0" step="0.01" oninput="updateItem('${item.id}','client_rate',this.value)" style="width:62px;color:var(--gold)"></td>
       <td class="num">${fmtC0(tc)}</td>
-      <td class="num" style="color:var(--gold2)">${fmtC0(tr)}</td>
+      <td class="num" style="color:var(--gold)">${fmtC0(tr)}</td>
       <td class="${gpPct>=0?'gp-pos':'gp-neg'}">${fmtN(gpPct,1)}%</td>
       <td><button class="btn-del" onclick="deleteItem('${item.id}')">✕</button></td>
     </tr>`
@@ -1715,8 +1820,8 @@ function renderTrades(){
   const grouped={}
   ITEMS.forEach(item=>{
     const trade=TRADES.find(t=>t.id===item.trade_id)
-    const name=trade?.name||'Unassigned'
-    if(!grouped[name]) grouped[name]={items:[],color:trade?.color||'#6A6358'}
+    const name=trade?.name||'Other Works'
+    if(!grouped[name]) grouped[name]={items:[],color:trade?.color||'#9C8C78',sort:trade?.sort_order??99}
     grouped[name].items.push(item)
   })
   const cont=$('trades-content')
@@ -1724,7 +1829,14 @@ function renderTrades(){
     cont.innerHTML='<div class="empty-state"><div class="es-icon">◇</div><p>No items in the quotation yet</p></div>'
     return
   }
-  cont.innerHTML=Object.entries(grouped).map(([name,{items,color}])=>{
+  const sortedEntries=Object.entries(grouped).sort(([a,{sort:as}],[b,{sort:bs}])=>{
+    const ai=TRADE_ORDER.indexOf(a), bi=TRADE_ORDER.indexOf(b)
+    if(ai>-1&&bi>-1) return ai-bi
+    if(ai>-1) return -1
+    if(bi>-1) return 1
+    return as-bs
+  })
+  cont.innerHTML=sortedEntries.map(([name,{items,color}])=>{
     const total=items.reduce((s,i)=>s+(i.cost_rate||0)*(i.quantity||0),0)
     return `<div class="trade-block">
       <div class="trade-hd">
@@ -1734,29 +1846,27 @@ function renderTrades(){
         </div>
         <span style="font-weight:600;color:var(--txt)">${fmtC(total)}</span>
       </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr>
-            <th>Room</th><th>Specification</th><th>Description</th>
-            <th class="r">Qty</th><th class="r">Unit</th><th class="r">Rate</th><th class="r">Total</th>
-          </tr></thead>
-          <tbody>${items.map(i=>{
-            const mat=MATS.find(m=>m.id===i.material_id)
-            return `<tr>
-              <td>${esc(i.room_name||'—')}</td>
-              <td>${esc(mat?.name||'—')}</td>
-              <td>${esc(i.description||'—')}</td>
-              <td class="r">${fmtN(i.quantity,1)}</td>
-              <td class="r">${i.unit}</td>
-              <td class="r">${fmtC(i.cost_rate)}</td>
-              <td class="r">${fmtC((i.cost_rate||0)*(i.quantity||0))}</td>
-            </tr>`}).join('')}</tbody>
-          <tfoot><tr>
-            <td colspan="6" style="text-align:right;padding:7px 9px;color:var(--txt2)">Sub-total</td>
-            <td style="text-align:right;padding:7px 9px;color:var(--gold2);font-weight:700">${fmtC(total)}</td>
-          </tr></tfoot>
-        </table>
-      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>Room</th><th>Specification</th><th>Description</th>
+          <th class="r">Qty</th><th class="r">Unit</th><th class="r">Rate</th><th class="r">Total</th>
+        </tr></thead>
+        <tbody>${items.map(i=>{
+          const mat=MATS.find(m=>m.id===i.material_id)
+          return `<tr>
+            <td>${esc(i.room_name||'—')}</td>
+            <td>${esc(mat?.name||'—')}</td>
+            <td>${esc(i.description||'—')}</td>
+            <td class="r">${fmtN(i.quantity,1)}</td>
+            <td class="r">${i.unit}</td>
+            <td class="r">${fmtC(i.cost_rate)}</td>
+            <td class="r">${fmtC((i.cost_rate||0)*(i.quantity||0))}</td>
+          </tr>`}).join('')}</tbody>
+        <tfoot><tr>
+          <td colspan="6" style="text-align:right;padding:7px 9px;color:var(--txt2)">Sub-total</td>
+          <td style="text-align:right;padding:7px 9px;color:var(--gold);font-weight:700">${fmtC(total)}</td>
+        </tr></tfoot>
+      </table></div>
     </div>`
   }).join('')
 }
@@ -1857,15 +1967,22 @@ function renderClientView(){
   const addr=PROFILE?.address||''
   const tSqm=ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
   const tSqft=ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
-  // Group by trade
+  // Group by trade, sorted by TRADE_ORDER
   const grouped={}
   ITEMS.forEach(i=>{
     const trade=TRADES.find(t=>t.id===i.trade_id)
     const name=trade?.name||'Other Works'
-    if(!grouped[name]) grouped[name]=[]
-    grouped[name].push(i)
+    if(!grouped[name]) grouped[name]={items:[],sort:trade?.sort_order??99}
+    grouped[name].items.push(i)
   })
-  const tradeSections=Object.entries(grouped).map(([tradeName,items],ti)=>{
+  const sortedTrades=Object.entries(grouped).sort(([a,{sort:as}],[b,{sort:bs}])=>{
+    const ai=TRADE_ORDER.indexOf(a), bi=TRADE_ORDER.indexOf(b)
+    if(ai>-1&&bi>-1) return ai-bi
+    if(ai>-1) return -1
+    if(bi>-1) return 1
+    return as-bs
+  })
+  const tradeSections=sortedTrades.map(([tradeName,{items}])=>{
     const trTotal=items.reduce((s,i)=>s+(i.client_rate||0)*(i.quantity||0)*cx,0)
     const rows=items.map((i,idx)=>{
       const mat=MATS.find(m=>m.id===i.material_id)
@@ -1879,6 +1996,15 @@ function renderClientView(){
         <td class="r">${fmtC(unitRate)}</td>
         <td class="r">${fmtC(amount)}</td>
       </tr>`}).join('')
+    // Per-trade disclaimer notes
+    const disclaimers=TRADE_DISCLAIMERS[tradeName]||[]
+    const disclaimerHtml=disclaimers.length?`
+      <div style="padding:8px 10px 6px;border-top:1px solid #F0EDE6;background:#FAFAF8">
+        <div style="font-size:9px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Notes &amp; Conditions</div>
+        ${disclaimers.map((d,i)=>`<div style="font-size:10px;color:#666;line-height:1.6;display:flex;gap:6px;margin-bottom:3px">
+          <span style="color:#C49A3C;flex-shrink:0">${i+1}.</span><span>${esc(d)}</span>
+        </div>`).join('')}
+      </div>`:''
     return `<div class="cv-sec">
       <div class="cv-sec-title">${esc(tradeName)}</div>
       <table class="cv-tbl">
@@ -1889,6 +2015,7 @@ function renderClientView(){
           <td style="text-align:right;padding:6px 9px;font-weight:700;color:#1A1A1A">${fmtC(trTotal)}</td>
         </tr></tfoot>
       </table>
+      ${disclaimerHtml}
     </div>`
   }).join('')
   $('client-doc').innerHTML=`
@@ -2024,9 +2151,68 @@ function ucFrom(unit, raw){
   }
 }
 
-// ═══════════════════════════════════════════════════
-// MATERIALS DATABASE — CRUD
-// ═══════════════════════════════════════════════════
+// ─── Searchable dropdown helper ─────────────────────
+function srchDrop(opts, currentVal, itemId, field, placeholder){
+  const uid = `${itemId}_${field}`
+  const currentLabel = opts.find(o=>o.v===currentVal)?.l || currentVal || ''
+  return `<div class="srch-wrap" id="sw_${uid}">
+    <input class="srch-inp" id="si_${uid}" value="${esc(currentLabel)}" placeholder="${esc(placeholder||'Search…')}"
+      autocomplete="off"
+      onfocus="sdOpen('${uid}')"
+      oninput="sdFilter('${uid}')"
+      onkeydown="sdKey(event,'${uid}')">
+    <div class="srch-list" id="sl_${uid}">
+      ${opts.map(o=>`<div class="srch-opt${o.v===currentVal?' hi':''}" data-v="${esc(o.v)}" data-l="${esc(o.l)}" data-iid="${esc(itemId)}" data-field="${esc(field)}" onclick="sdPick('${uid}',this)">${esc(o.l)}</div>`).join('')}
+    </div>
+  </div>`
+}
+
+function sdOpen(uid){
+  document.querySelectorAll('.srch-list.open').forEach(el=>{ if(el.id!=='sl_'+uid) el.classList.remove('open') })
+  const list=document.getElementById('sl_'+uid)
+  if(list){ list.classList.add('open'); sdFilter(uid) }
+}
+function sdFilter(uid){
+  const inp=document.getElementById('si_'+uid)
+  const list=document.getElementById('sl_'+uid)
+  if(!inp||!list) return
+  list.classList.add('open')
+  const q=inp.value.toLowerCase()
+  let visible=0
+  list.querySelectorAll('.srch-opt').forEach(el=>{
+    const match=el.dataset.l.toLowerCase().includes(q)
+    el.style.display=match?'':'none'
+    if(match) visible++
+  })
+  let empty=list.querySelector('.srch-empty')
+  if(!visible){
+    if(!empty){ empty=document.createElement('div'); empty.className='srch-empty'; empty.textContent='No results'; list.appendChild(empty) }
+  } else if(empty) empty.remove()
+}
+function sdKey(e,uid){
+  if(e.key==='Escape'){ const l=document.getElementById('sl_'+uid); if(l) l.classList.remove('open') }
+  if(e.key==='Enter'){
+    const list=document.getElementById('sl_'+uid)
+    if(!list) return
+    const first=Array.from(list.querySelectorAll('.srch-opt')).find(el=>el.style.display!=='none')
+    if(first) sdPick(uid,first)
+  }
+}
+function sdPick(uid,el){
+  const inp=document.getElementById('si_'+uid)
+  const list=document.getElementById('sl_'+uid)
+  if(inp) inp.value=el.dataset.l
+  if(list) list.classList.remove('open')
+  // Update the item via the standard updateItem function
+  const iid=el.dataset.iid, field=el.dataset.field, val=el.dataset.v
+  if(iid&&field) updateItem(iid, field, val)
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.srch-wrap')){
+    document.querySelectorAll('.srch-list.open').forEach(el=>el.classList.remove('open'))
+  }
+})
+
 let DB_SEL_TRADE = null
 let CRUD_MODE    = null
 let CRUD_DATA    = {}
