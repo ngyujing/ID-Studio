@@ -936,7 +936,7 @@ const UNITS = ['sqft','sqm','ft','mtr','L','no.','Room','Lot','Set','pcs','Lump'
 
 const TRADE_ORDER = [
   'Professional Services','Preliminary & Post Works','Hacking & Demolition Works',
-  'Masonry & Tiling Works','Floor Works','Carpentry Works','Plumbing Works',
+  'Masonry & Tiling Works','Ceiling Works','Floor Works','Carpentry Works','Plumbing Works',
   'Painting Works','Door Works','Glass / Mirror Works','Electrical Works',
 ]
 
@@ -1916,7 +1916,15 @@ function renderMoodboard(){
     </div>`
   }).join('')
   // Breakdown table
-  const activeTrades=TRADES.filter(t=>ITEMS.some(i=>i.trade_id===t.id))
+  const activeTrades=TRADES
+    .filter(t=>ITEMS.some(i=>i.trade_id===t.id))
+    .sort((a,b)=>{
+      const ai=TRADE_ORDER.indexOf(a.name), bi=TRADE_ORDER.indexOf(b.name)
+      if(ai>-1&&bi>-1) return ai-bi
+      if(ai>-1) return -1
+      if(bi>-1) return 1
+      return (a.sort_order||99)-(b.sort_order||99)
+    })
   $('mood-breakdown').innerHTML=`
     <div style="font-family:var(--ff-h);font-size:15px;color:var(--gold2);margin-bottom:10px">Cost Breakdown by Trade — All Tiers</div>
     <div style="overflow-x:auto">
@@ -2059,6 +2067,45 @@ function renderClientView(){
         <div class="cv-info-blk"><div class="cv-info-lbl">Total Area</div><div class="cv-info-val">${fmtN(tSqm,1)} sqm / ${fmtN(tSqft,0)} sqft</div></div>
         <div class="cv-info-blk"><div class="cv-info-lbl">Property Type</div><div class="cv-info-val">${PROP_TYPE==='hdb'?'HDB':PROP_TYPE==='condo'?'Condo / Landed':'Commercial'}</div></div>
       </div>
+
+      <!-- SUMMARY TABLE -->
+      <div class="cv-sec">
+        <div class="cv-sec-title">Summary of Works</div>
+        <table class="cv-tbl">
+          <thead>
+            <tr>
+              <th style="width:36px">No.</th>
+              <th>Trade / Scope of Works</th>
+              <th class="r" style="width:120px">Price (SGD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedTrades.map(([tradeName,{items}],idx)=>{
+              const trTotal=items.reduce((s,i)=>s+(i.client_rate||0)*(i.quantity||0)*cx,0)
+              return `<tr>
+                <td style="color:#888">${idx+1}</td>
+                <td style="font-weight:500">${esc(tradeName)}</td>
+                <td class="r">${trTotal>0?fmtC(trTotal):'Inclusive'}</td>
+              </tr>`
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2" style="text-align:right;font-weight:600;padding:8px 10px">Sub-total</td>
+              <td class="r" style="padding:8px 10px;font-weight:600">${fmtC(t.rev)}</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="text-align:right;padding:6px 10px;color:#666">GST (9%)</td>
+              <td class="r" style="padding:6px 10px;color:#666">${fmtC(gst)}</td>
+            </tr>
+            <tr style="background:#1A1A1A">
+              <td colspan="2" style="text-align:right;padding:9px 10px;font-weight:700;font-size:13px;color:#fff">Grand Total (SGD)</td>
+              <td class="r" style="padding:9px 10px;font-weight:700;font-size:13px;color:#C49A3C">${fmtC(grand)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
       ${tradeSections}
       <div class="cv-totals-box">
         <div class="cv-tots-row">
