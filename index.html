@@ -277,6 +277,10 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 
 @page { margin: 12mm; size: A4; }
 @media print{
+  #sig-rep-name, #sig-rep-date {
+    border-bottom: none !important;
+    -webkit-print-color-adjust: exact;
+  }
   .sidebar,.top-bar,.kpi-strip,.tab-bar,#V-rooms,#V-items,#V-trades,#V-moodboard,
   #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print,
   #bottom-nav,#mobile-back-btn{display:none!important}
@@ -2198,9 +2202,19 @@ function renderClientView(){
         <div>
           <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:60px">Company Representative</div>
           <div style="height:1px;background:#1A1A1A;margin-bottom:10px"></div>
-          <div style="font-size:12px;font-weight:600;color:#1A1A1A">${esc(PROFILE?.full_name||'Authorised Signatory')}</div>
+          <input id="sig-rep-name"
+            value="${esc(PROFILE?.full_name||'')}"
+            placeholder="Representative name"
+            style="border:none;border-bottom:1px dashed #ccc;border-radius:0;background:transparent;font-size:12px;font-weight:600;color:#1A1A1A;padding:2px 0;width:100%;outline:none;font-family:inherit"
+            class="no-print-hide">
+          <div class="print-only-name" style="display:none;font-size:12px;font-weight:600;color:#1A1A1A"></div>
           <div style="font-size:10px;color:#888;margin-top:2px">${esc(co)}</div>
-          <div style="font-size:10px;color:#888;margin-top:8px">Date: ___________________________</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
+            <span style="font-size:10px;color:#888;white-space:nowrap">Date:</span>
+            <input id="sig-rep-date"
+              type="date"
+              style="border:none;border-bottom:1px dashed #ccc;border-radius:0;background:transparent;font-size:10px;color:#555;padding:1px 0;outline:none;font-family:inherit;flex:1;min-width:0">
+          </div>
         </div>
         <div>
           <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:60px">Client / Customer</div>
