@@ -275,6 +275,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 .toast.ok{border-color:var(--grn)}.toast.err{border-color:var(--red)}
 @keyframes toastIn{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
 
+@page { margin: 12mm; size: A4; }
 @media print{
   .sidebar,.top-bar,.kpi-strip,.tab-bar,#V-rooms,#V-items,#V-trades,#V-moodboard,
   #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print,
@@ -2178,21 +2179,25 @@ function renderClientView(){
             <td style="padding:5px 0"><strong>Delay and Extension of Time Due to Approvals:</strong> In the event of any delay caused by the Customer's failure to issue necessary permits or approvals, such delays shall not be counted towards the original project timeline, and the Completion Date shall be adjusted accordingly to reflect the additional time required.</td></tr>
         </table>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;padding:20px 28px;border-top:1px solid #eee;background:#fff">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:32px 28px 48px;border-top:1px solid #eee;background:#fff">
         <div>
-          <div style="height:1px;background:#1A1A1A;width:180px;margin-bottom:8px"></div>
+          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:60px">Company Representative</div>
+          <div style="height:1px;background:#1A1A1A;margin-bottom:10px"></div>
           <div style="font-size:12px;font-weight:600;color:#1A1A1A">${esc(PROFILE?.full_name||'Authorised Signatory')}</div>
-          <div style="font-size:10px;color:#888">${esc(co)}</div>
+          <div style="font-size:10px;color:#888;margin-top:2px">${esc(co)}</div>
+          <div style="font-size:10px;color:#888;margin-top:8px">Date: ___________________________</div>
         </div>
         <div>
-          <div style="height:1px;background:#1A1A1A;width:180px;margin-bottom:8px"></div>
-          <div style="font-size:12px;color:#1A1A1A">NAME: ________________________</div>
-          <div style="font-size:10px;color:#888;margin-top:4px">NRIC (Last 4): ________ &nbsp; DATE: ____________</div>
-          <div style="font-size:10px;color:#888;margin-top:2px">Confirmed &amp; accepted by Client</div>
+          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:60px">Client / Customer</div>
+          <div style="height:1px;background:#1A1A1A;margin-bottom:10px"></div>
+          <div style="font-size:12px;color:#1A1A1A">Name: ________________________________</div>
+          <div style="font-size:10px;color:#888;margin-top:8px">NRIC (Last 4 digits): _______________</div>
+          <div style="font-size:10px;color:#888;margin-top:8px">Date: ___________________________</div>
+          <div style="font-size:10px;color:#888;margin-top:8px;font-style:italic">By signing above, the Client confirms acceptance of this quotation and all terms &amp; conditions herein.</div>
         </div>
       </div>
       <div class="cv-footer">
-        <div>${esc(co)} &nbsp;|&nbsp; UEN: ${esc(uen)} &nbsp;|&nbsp; ${esc(phone)} &nbsp;|&nbsp; ${esc(addr)}</div>
+        <div style="opacity:0">.</div>
         <div>Page 1 of 1 — Confidential</div>
       </div>
     </div>`
