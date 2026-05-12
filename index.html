@@ -2014,18 +2014,44 @@ function renderClientView(){
   })
   const tradeSections=sortedTrades.map(([tradeName,{items}])=>{
     const trTotal=items.reduce((s,i)=>s+(i.client_rate||0)*(i.quantity||0)*cx,0)
-    const rows=items.map((i,idx)=>{
+
+    // Merge lines with identical specification AND description AND unit rate
+    const merged=[]
+    items.forEach(i=>{
       const mat=MATS.find(m=>m.id===i.material_id)
-      const unitRate=(i.client_rate||0)*cx
-      const amount=unitRate*(i.quantity||0)
-      return `<tr>
-        <td>${idx+1}</td>
-        <td>${esc(mat?.name||i.description||'—')}</td>
-        <td style="white-space:pre-wrap">${escNl(i.description||'—')}</td>
-        <td class="r">${fmtN(i.quantity,2)} ${i.unit}</td>
-        <td class="r">${fmtC(unitRate)}</td>
-        <td class="r">${fmtC(amount)}</td>
-      </tr>`}).join('')
+      const specKey=mat?.name||i.description||''
+      const descKey=i.description||''
+      const rateKey=(i.client_rate||0)*cx
+      const unitKey=i.unit||''
+      // Match on spec + description + unit rate + unit
+      const existing=merged.find(m=>
+        m.specKey===specKey && m.descKey===descKey &&
+        Math.abs(m.rateKey-rateKey)<0.001 && m.unitKey===unitKey
+      )
+      if(existing){
+        existing.qty += (i.quantity||0)
+        existing.amount += rateKey*(i.quantity||0)
+        existing.rooms.push(i.room_name||'')
+      } else {
+        merged.push({
+          specKey, descKey, rateKey, unitKey,
+          mat, qty:(i.quantity||0),
+          amount:rateKey*(i.quantity||0),
+          rooms:[i.room_name||''],
+          unit:i.unit||''
+        })
+      }
+    })
+
+    const rows=merged.map((m,idx)=>`<tr>
+      <td>${idx+1}</td>
+      <td>${esc(m.specKey||'—')}</td>
+      <td style="white-space:pre-wrap">${escNl(m.descKey||'—')}${m.rooms.filter(Boolean).length?`<div style="font-size:9px;color:#aaa;margin-top:2px">${m.rooms.filter(Boolean).join(', ')}</div>`:''}</td>
+      <td class="r">${fmtN(m.qty,2)} ${m.unit}</td>
+      <td class="r">${fmtC(m.rateKey)}</td>
+      <td class="r">${fmtC(m.amount)}</td>
+    </tr>`).join('')
+
     // Per-trade disclaimer notes
     const disclaimers=TRADE_DISCLAIMERS[tradeName]||[]
     const disclaimerHtml=disclaimers.length?`
