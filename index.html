@@ -1786,7 +1786,7 @@ function renderItemsTable(){
       <td>${roomSel}</td>
       <td>${tradeSel}</td>
       <td>${matSel}</td>
-      <td><input type="text"   value="${esc(item.description||'')}" oninput="updateItem('${item.id}','description',this.value)" placeholder="Description…"></td>
+      <td><textarea oninput="updateItem('${item.id}','description',this.value)" placeholder="Description…" style="min-height:38px;resize:vertical;line-height:1.4;padding:3px 5px;font-size:11px">${esc(item.description||'')}</textarea></td>
       <td class="num"><input type="number" value="${item.quantity!=null?item.quantity:''}" min="0" step="0.01" oninput="updateItem('${item.id}','quantity',this.value)" style="width:100%;text-align:right"></td>
       <td><select onchange="updateItem('${item.id}','unit',this.value)">${unitOpts}</select></td>
       <td class="num"><input type="number" value="${item.cost_rate!=null?item.cost_rate:''}"   min="0" step="0.01" oninput="updateItem('${item.id}','cost_rate',this.value)"   style="width:100%;text-align:right"></td>
@@ -2452,7 +2452,7 @@ function openMatModal(id){
     </div>
     <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
       <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Default Description</label>
-      <input id="cm-mat-desc" value="${esc(m?.description||'')}" placeholder="Auto-fills when selected in quotation">
+      <textarea id="cm-mat-desc" placeholder="Auto-fills when selected in quotation" style="min-height:80px;resize:vertical;line-height:1.5">${esc(m?.description||'')}</textarea>
     </div>
     <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
       <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Default Unit</label>
