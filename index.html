@@ -2751,7 +2751,9 @@ function renderUsersTable(){
           <button class="btn-del"
             onclick="openUserModal('password','${u.id}')" style="padding:3px 7px;font-size:10px;white-space:nowrap">🔑 Pwd</button>
           ${!isMe?`<button class="btn-del" style="padding:3px 7px;font-size:10px;white-space:nowrap"
-            onclick="toggleUserActive('${u.id}',${active})">${active?'⊘ Deactivate':'✓ Activate'}</button>`:''
+            onclick="toggleUserActive('${u.id}',${active})">${active?'⊘ Deactivate':'✓ Activate'}</button>
+          <button class="btn-del" style="padding:3px 7px;font-size:10px;white-space:nowrap;color:var(--red);border-color:var(--red)"
+            onclick="deleteUser('${u.id}','${esc(u.email||'')}')">✕ Delete</button>`:''
           }
         </div>
       </td>
@@ -2805,9 +2807,6 @@ function openUserModal(mode, userId){
           <option value="user"  ${(u?.role||'user')==='user' ?'selected':''}>User</option>
           <option value="admin" ${u?.role==='admin'?'selected':''}>Admin</option>
         </select>
-      </div>
-      <div class="form-group"><label class="form-label">Notes</label>
-        <textarea id="um-notes" style="min-height:60px">${esc(u?.notes||'')}</textarea>
       </div>`
   }
 
@@ -2865,7 +2864,6 @@ async function saveUserModal(){
         company_name: $('um-co').value.trim(),
         phone:        $('um-ph').value.trim(),
         role:         $('um-role').value,
-        notes:        $('um-notes').value.trim(),
       }
       const {error}=await db.from('profiles').update(upd).eq('id',USER_MODAL_ID)
       if(error) throw error
@@ -2901,6 +2899,25 @@ async function toggleUserActive(id, currentlyActive){
   const {error}=await db.from('profiles').update({is_active:!currentlyActive}).eq('id',id)
   if(error){ toast('Failed: '+error.message,'err'); return }
   toast(`User ${action}d ✓`)
+  renderUsersPanel()
+}
+
+async function deleteUser(id, email){
+  const msg = `Delete user "${email}"?\n\nThis removes their profile and all associated data from this app.\n\nNote: To also remove their login credentials, go to your Supabase dashboard → Authentication → Users and delete them there.\n\nType DELETE to confirm.`
+  const confirm_txt = window.prompt(msg)
+  if(confirm_txt !== 'DELETE'){ if(confirm_txt!==null) toast('Cancelled — type DELETE exactly to confirm','err'); return }
+  // Delete quotations and related data first
+  const {data:qIds}=await db.from('quotations').select('id').eq('user_id',id)
+  if(qIds?.length){
+    const ids=qIds.map(q=>q.id)
+    await db.from('quotation_items').delete().in('quotation_id',ids)
+    await db.from('quotation_rooms').delete().in('quotation_id',ids)
+    await db.from('quotations').delete().in('id',ids)
+  }
+  // Delete profile
+  const {error}=await db.from('profiles').delete().eq('id',id)
+  if(error){ toast('Delete failed: '+error.message,'err'); return }
+  toast('User and all their data deleted. Remove their auth login from Supabase dashboard.')
   renderUsersPanel()
 }
 
