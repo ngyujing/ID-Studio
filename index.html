@@ -20,6 +20,13 @@
   --ff-h:'Cormorant Garamond',serif;
   --ff-b:'DM Sans',system-ui,sans-serif;
 }
+[data-theme="dark"]{
+  --bg:#0C0B09;--s1:#131210;--s2:#1C1A15;--s3:#24221C;
+  --bdr:#302E26;--bdr2:#3C3A31;
+  --gold:#C49A3C;--gold2:#E0B85A;--gold3:#F5D07A;
+  --txt:#EDE6D3;--txt2:#A89E8A;--txt3:#6A6358;
+  --grn:#5A9E75;--red:#9E5A5A;--blu:#5A7A9E;
+}
 html,body{background:var(--bg);color:var(--txt);font-family:var(--ff-b);font-size:13px;min-height:100vh;-webkit-font-smoothing:antialiased}
 input,select,textarea{background:var(--s2);color:var(--txt);border:1px solid var(--bdr);border-radius:4px;padding:6px 9px;font-family:var(--ff-b);font-size:12px;outline:none;transition:border-color .15s;width:100%}
 input:focus,select:focus,textarea:focus{border-color:var(--gold)}
@@ -283,7 +290,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   }
   .sidebar,.top-bar,.kpi-strip,.tab-bar,#V-rooms,#V-items,#V-trades,#V-moodboard,
   #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print,
-  #bottom-nav,#mobile-back-btn{display:none!important}
+  #bottom-nav,#mobile-back-btn,#mobile-theme-btn{display:none!important}
   body,html{background:#fff!important}
   .content-area{padding:0!important}
   .cv-doc{border-radius:0;box-shadow:none}
@@ -498,6 +505,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 }
 @media (min-width: 769px) {
   #mobile-back-btn { display: none !important; }
+  #mobile-theme-btn { display: none !important; }
 }
 /* Searchable dropdown */
 .srch-wrap{position:relative;width:100%;min-width:0}
@@ -569,6 +577,10 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
         <div class="user-name" id="sb-name">—</div>
         <div class="user-co"   id="sb-co">—</div>
       </div>
+      <button id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark mode"
+        style="background:transparent;border:1px solid var(--bdr);color:var(--txt3);padding:5px 8px;border-radius:4px;font-size:14px;cursor:pointer;flex-shrink:0;transition:all .15s"
+        onmouseover="this.style.color='var(--gold)';this.style.borderColor='var(--gold)'"
+        onmouseout="this.style.color='var(--txt3)';this.style.borderColor='var(--bdr)'">☀</button>
       <button class="btn-signout" onclick="doSignOut()" title="Sign out">⏻</button>
     </div>
   </aside>
@@ -901,6 +913,13 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 <button id="mobile-back-btn" onclick="navTo('dashboard')" style="display:none">
   ← Back to Projects
 </button>
+
+<!-- MOBILE THEME TOGGLE (always visible on mobile) -->
+<button id="mobile-theme-btn" onclick="toggleTheme()"
+  style="display:none;position:fixed;bottom:calc(60px + env(safe-area-inset-bottom,0px) + 12px);right:12px;
+  background:var(--s1);border:1px solid var(--bdr);border-radius:50%;width:40px;height:40px;
+  font-size:16px;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.12);
+  cursor:pointer;z-index:150;font-family:var(--ff-b);-webkit-tap-highlight-color:transparent">☀</button>
 
 <!-- TRADE / MATERIAL MODAL -->
 <div id="crud-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeModalBg(event)">
@@ -2612,6 +2631,51 @@ function closeCrudModal(){
   CRUD_MODE=null;CRUD_DATA={}
   const btn=$('crud-save-btn');btn.disabled=false;btn.textContent='Save'
 }
+
+// ═══════════════════════════════════════════════════
+// THEME TOGGLE
+// ═══════════════════════════════════════════════════
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark'
+  const newTheme = isDark ? 'light' : 'dark'
+  applyTheme(newTheme)
+  try{ localStorage.setItem('yj-theme', newTheme) }catch(e){}
+}
+
+function applyTheme(theme){
+  if(theme==='dark'){
+    document.documentElement.setAttribute('data-theme','dark')
+    const btn=document.getElementById('theme-btn')
+    if(btn) btn.textContent='🌙'
+    const mbtn=document.getElementById('mobile-theme-btn')
+    if(mbtn) mbtn.textContent='🌙'
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+    const btn=document.getElementById('theme-btn')
+    if(btn) btn.textContent='☀'
+    const mbtn=document.getElementById('mobile-theme-btn')
+    if(mbtn) mbtn.textContent='☀'
+  }
+  // Keep auth card background in sync
+  const authWrap=document.querySelector('.auth-wrap')
+  if(authWrap){
+    if(theme==='dark'){
+      authWrap.style.backgroundImage='radial-gradient(ellipse at 20% 50%,rgba(196,154,60,.07) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(90,154,117,.04) 0%,transparent 50%)'
+    } else {
+      authWrap.style.backgroundImage='radial-gradient(ellipse at 20% 50%,rgba(160,115,42,.09) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(45,122,80,.06) 0%,transparent 50%)'
+    }
+  }
+}
+
+function initTheme(){
+  try{
+    const saved=localStorage.getItem('yj-theme')
+    if(saved) applyTheme(saved)
+  }catch(e){}
+}
+
+// Apply saved theme immediately on load (before boot)
+initTheme()
 
 // ═══════════════════════════════════════════════════
 // BOOT — FINAL
