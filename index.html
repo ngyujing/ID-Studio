@@ -2822,7 +2822,12 @@ function openUserModal(mode, userId){
         <input id="um-pw2" type="password" placeholder="Repeat password"></div>
       ${u?.id===USER.id
         ? '<div style="font-size:11px;color:var(--grn)">✓ Updating your own password — takes effect immediately.</div>'
-        : '<div style="font-size:11px;color:var(--txt3);line-height:1.6">⚠ You can only reset your own password from the frontend. To reset another user\'s password, go to your <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--gold)">Supabase dashboard</a> → Authentication → Users → find the user → Send password reset email.</div>'
+        : `<div style="background:var(--s3);border:1px solid var(--bdr);border-radius:5px;padding:10px;font-size:11px;color:var(--txt2);line-height:1.6;margin-top:8px">
+            Or click the button below to send a <strong>password reset email</strong> directly to ${esc(u?.email||'this user')}. They will receive a link to set a new password.
+          </div>
+          <button class="btn-ghost" style="margin-top:8px;width:100%" onclick="sendPasswordResetEmail('${esc(u?.email||'')}')">
+            📧 Send Password Reset Email
+          </button>`
       }`
   }
 
@@ -2903,22 +2908,66 @@ async function toggleUserActive(id, currentlyActive){
 }
 
 async function deleteUser(id, email){
-  const msg = `Delete user "${email}"?\n\nThis removes their profile and all associated data from this app.\n\nNote: To also remove their login credentials, go to your Supabase dashboard → Authentication → Users and delete them there.\n\nType DELETE to confirm.`
-  const confirm_txt = window.prompt(msg)
-  if(confirm_txt !== 'DELETE'){ if(confirm_txt!==null) toast('Cancelled — type DELETE exactly to confirm','err'); return }
-  // Delete quotations and related data first
-  const {data:qIds}=await db.from('quotations').select('id').eq('user_id',id)
-  if(qIds?.length){
-    const ids=qIds.map(q=>q.id)
-    await db.from('quotation_items').delete().in('quotation_id',ids)
-    await db.from('quotation_rooms').delete().in('quotation_id',ids)
-    await db.from('quotations').delete().in('id',ids)
+  const callerProfile = USERS_LIST.find(u=>u.id===USER.id)
+  if(callerProfile?.role !== 'admin'){
+    toast('Only admins can delete users. Ask an admin to do this.','err')
+    return
   }
-  // Delete profile
-  const {error}=await db.from('profiles').delete().eq('id',id)
-  if(error){ toast('Delete failed: '+error.message,'err'); return }
-  toast('User and all their data deleted. Remove their auth login from Supabase dashboard.')
-  renderUsersPanel()
+  const confirmTxt = window.prompt(
+    `Permanently delete "${email}"?\n\nThis will:\n• Remove their login credentials\n• Delete all their quotations and data\n• This cannot be undone\n\nType DELETE to confirm.`
+  )
+  if(confirmTxt !== 'DELETE'){
+    if(confirmTxt !== null) toast('Cancelled — type DELETE exactly','err')
+    return
+  }
+
+  const btn_toast = toast('Deleting user…','ok')
+
+  try{
+    // Delete quotations + related data first
+    const {data:qIds} = await db.from('quotations').select('id').eq('user_id',id)
+    if(qIds?.length){
+      const ids = qIds.map(q=>q.id)
+      await db.from('quotation_items').delete().in('quotation_id',ids)
+      await db.from('quotation_rooms').delete().in('quotation_id',ids)
+      await db.from('quotations').delete().in('id',ids)
+    }
+    // Delete profile row
+    await db.from('profiles').delete().eq('id',id)
+
+    // Call Edge Function to delete the auth user fully
+    const { data:{ session } } = await db.auth.getSession()
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/delete-user`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey':        SUPABASE_KEY,
+        },
+        body: JSON.stringify({ userId: id })
+      }
+    )
+    const result = await res.json()
+    if(!res.ok) throw new Error(result.error || 'Edge Function error')
+
+    toast('User fully deleted ✓')
+    renderUsersPanel()
+  }catch(e){
+    toast('Error: '+e.message,'err')
+    renderUsersPanel()
+  }
+}
+
+async function sendPasswordResetEmail(email){
+  if(!email){ toast('No email address found','err'); return }
+  const {error} = await db.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  })
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast(`Password reset email sent to ${email} ✓`)
+  closeUserModal()
 }
 
 function closeUserModalBg(e){ if(e.target===$('user-modal-bg')) closeUserModal() }
