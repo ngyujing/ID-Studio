@@ -289,7 +289,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
     -webkit-print-color-adjust: exact;
   }
   .sidebar,.top-bar,.kpi-strip,.tab-bar,#V-rooms,#V-items,#V-trades,#V-moodboard,
-  #V-gantt,#V-dashboard,#V-calc,#V-settings,.no-print,
+  #V-gantt,#V-dashboard,#V-calc,#V-settings,#V-users,.no-print,
   #bottom-nav,#mobile-back-btn,#mobile-theme-btn{display:none!important}
   body,html{background:#fff!important}
   .content-area{padding:0!important}
@@ -569,6 +569,9 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       </button>
       <button class="sb-item" id="sb-settings" onclick="navTo('settings')">
         <span class="sb-icon">⚙</span>Settings
+      </button>
+      <button class="sb-item" id="sb-users" onclick="navTo('users')">
+        <span class="sb-icon">👥</span>Users
       </button>
     </nav>
     <div class="sb-foot">
@@ -889,6 +892,37 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
         </div>
       </div>
 
+      <!-- USERS PANEL -->
+      <div id="V-users" style="display:none">
+        <div class="sec-hd">
+          <div>
+            <div class="sec-title">User Management</div>
+            <div class="sec-sub">All registered accounts. Add, edit, deactivate or reset passwords.</div>
+          </div>
+          <button class="btn-primary" onclick="openUserModal('add')">+ Add User</button>
+        </div>
+        <!-- Stats row -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px" id="users-stats"></div>
+        <!-- Users table -->
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Company</th>
+              <th style="width:80px">Role</th>
+              <th style="width:80px">Status</th>
+              <th style="width:110px">Joined</th>
+              <th style="width:130px">Last Login</th>
+              <th style="width:140px"></th>
+            </tr></thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="8" class="empty-state"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div><!-- /content-area -->
   </div><!-- /main-col -->
 </div><!-- /S-app -->
@@ -932,6 +966,21 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--bdr)">
       <button class="btn-ghost" onclick="closeCrudModal()">Cancel</button>
       <button class="btn-primary" id="crud-save-btn" onclick="saveCrudModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div id="user-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeUserModalBg(event)">
+  <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div style="font-family:var(--ff-h);font-size:18px;color:var(--gold)" id="user-modal-title">Add User</div>
+      <button onclick="closeUserModal()" style="background:transparent;border:none;color:var(--txt3);font-size:18px;cursor:pointer;padding:2px 6px">✕</button>
+    </div>
+    <div id="user-modal-body"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--bdr)">
+      <button class="btn-ghost" onclick="closeUserModal()">Cancel</button>
+      <button class="btn-primary" id="user-save-btn" onclick="saveUserModal()">Save</button>
     </div>
   </div>
 </div>
@@ -1094,6 +1143,7 @@ async function afterLogin(){
   showScreen('app')
   await Promise.all([loadStaticData(),loadProfile()])
   updateSidebarUser()
+  updateLastLogin()  // record login time
   navTo('dashboard')
 }
 
@@ -1105,7 +1155,7 @@ function showScreen(n){
   $('S-app').style.display  = n==='app' ?'flex':'none'
 }
 
-const ALL_VIEWS=['dashboard','rooms','items','trades','moodboard','gantt','client','calc','settings','database']
+const ALL_VIEWS=['dashboard','rooms','items','trades','moodboard','gantt','client','calc','settings','database','users']
 function showView(id){
   ALL_VIEWS.forEach(v=>{ const e=$('V-'+v); if(e) e.style.display='none' })
   const t=$('V-'+id); if(t) t.style.display='block'
@@ -1113,7 +1163,7 @@ function showView(id){
 
 function navTo(view){
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('active'))
-  const map={dashboard:'sb-dashboard',calc:'sb-calc',settings:'sb-settings',database:'sb-database'}
+  const map={dashboard:'sb-dashboard',calc:'sb-calc',settings:'sb-settings',database:'sb-database',users:'sb-users'}
   if(map[view]) $(map[view])?.classList.add('active')
   const isBuilder=['rooms','items','trades','moodboard','gantt','client'].includes(view)
   $('top-bar').style.display   = isBuilder?'flex':'none'
@@ -1131,6 +1181,7 @@ function navTo(view){
   if(view==='calc')      initCalcs()
   if(view==='settings')  loadSettingsUI()
   if(view==='database')  renderDbPanel()
+  if(view==='users')     renderUsersPanel()
 }
 
 function mobileNavTo(view){
@@ -2630,6 +2681,240 @@ function closeCrudModal(){
   $('crud-modal-bg').style.display='none'
   CRUD_MODE=null;CRUD_DATA={}
   const btn=$('crud-save-btn');btn.disabled=false;btn.textContent='Save'
+}
+
+// ═══════════════════════════════════════════════════
+// USER MANAGEMENT
+// ═══════════════════════════════════════════════════
+let USERS_LIST = []
+let USER_MODAL_MODE = null   // 'add' | 'edit' | 'password' | 'view'
+let USER_MODAL_ID   = null
+
+async function renderUsersPanel(){
+  $('users-tbody').innerHTML='<tr><td colspan="8" class="empty-state"><span class="spinner"></span></td></tr>'
+  const {data, error} = await db.from('profiles').select('*').order('created_at', {ascending:false})
+  if(error){ toast('Failed to load users','err'); return }
+  USERS_LIST = data||[]
+  renderUsersTable()
+  renderUsersStats()
+}
+
+function renderUsersStats(){
+  const total    = USERS_LIST.length
+  const active   = USERS_LIST.filter(u=>u.is_active!==false).length
+  const inactive = total - active
+  const admins   = USERS_LIST.filter(u=>u.role==='admin').length
+  $('users-stats').innerHTML=`
+    <div class="tot-card"><div class="tot-lbl">Total Users</div><div class="tot-val">${total}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Active</div><div class="tot-val grn">${active}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Inactive</div><div class="tot-val" style="color:var(--red)">${inactive}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Admins</div><div class="tot-val gld">${admins}</div></div>
+  `
+}
+
+function renderUsersTable(){
+  const tbody=$('users-tbody')
+  if(!USERS_LIST.length){
+    tbody.innerHTML='<tr><td colspan="8" class="empty-state"><p>No users yet</p></td></tr>'
+    return
+  }
+  tbody.innerHTML=USERS_LIST.map(u=>{
+    const isMe  = u.id===USER.id
+    const active= u.is_active!==false
+    const role  = u.role||'user'
+    const joined= u.created_at ? fmtDate(u.created_at) : '—'
+    const last  = u.last_login  ? fmtDate(u.last_login)  : 'Never'
+    return `<tr style="${!active?'opacity:.55':''}">
+      <td style="font-weight:500">${esc(u.full_name||u.company_name||'—')}${isMe?'<span style="font-size:9px;background:var(--gold);color:#fff;border-radius:10px;padding:1px 6px;margin-left:6px;vertical-align:middle">You</span>':''}</td>
+      <td style="font-size:11px;color:var(--txt2)">${esc(u.email||'—')}</td>
+      <td style="font-size:11px;color:var(--txt2)">${esc(u.company_name||'—')}</td>
+      <td>
+        <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid;
+          color:${role==='admin'?'var(--gold)':'var(--txt3)'};
+          border-color:${role==='admin'?'var(--gold)':'var(--bdr)'}">
+          ${role}
+        </span>
+      </td>
+      <td>
+        <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid;
+          color:${active?'var(--grn)':'var(--red)'};
+          border-color:${active?'var(--grn)':'var(--red)'}">
+          ${active?'Active':'Inactive'}
+        </span>
+      </td>
+      <td style="font-size:11px;color:var(--txt3)">${joined}</td>
+      <td style="font-size:11px;color:var(--txt3)">${last}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button style="background:transparent;color:var(--blu);border:1px solid var(--blu);padding:3px 7px;font-size:10px;border-radius:4px;cursor:pointer;white-space:nowrap"
+            onclick="openUserModal('edit','${u.id}')">✎ Edit</button>
+          <button class="btn-del"
+            onclick="openUserModal('password','${u.id}')" style="padding:3px 7px;font-size:10px;white-space:nowrap">🔑 Pwd</button>
+          ${!isMe?`<button class="btn-del" style="padding:3px 7px;font-size:10px;white-space:nowrap"
+            onclick="toggleUserActive('${u.id}',${active})">${active?'⊘ Deactivate':'✓ Activate'}</button>`:''
+          }
+        </div>
+      </td>
+    </tr>`
+  }).join('')
+}
+
+// ── ADD USER ──────────────────────────────────────
+function openUserModal(mode, userId){
+  USER_MODAL_MODE = mode
+  USER_MODAL_ID   = userId||null
+  const u = userId ? USERS_LIST.find(x=>x.id===userId) : null
+  const titles={ add:'Add New User', edit:'Edit User', password:'Reset Password' }
+  $('user-modal-title').textContent = titles[mode]||'User'
+
+  if(mode==='add'){
+    $('user-modal-body').innerHTML=`
+      <div class="form-group"><label class="form-label">Full Name *</label>
+        <input id="um-name" placeholder="Jane Tan"></div>
+      <div class="form-group"><label class="form-label">Email Address *</label>
+        <input id="um-email" type="email" placeholder="jane@example.com"></div>
+      <div class="form-group"><label class="form-label">Temporary Password *</label>
+        <input id="um-pw" type="password" placeholder="Min 8 characters">
+        <div style="font-size:10px;color:var(--txt3);margin-top:3px">User can change this after first login via Settings.</div>
+      </div>
+      <div class="form-group"><label class="form-label">Company Name</label>
+        <input id="um-co" placeholder="YJ Studio"></div>
+      <div class="form-group"><label class="form-label">Role</label>
+        <select id="um-role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:5px;padding:10px;font-size:11px;color:var(--txt2);line-height:1.6">
+        ℹ A welcome email will be sent if email confirmation is enabled in Supabase. Otherwise the account is active immediately.
+      </div>`
+  }
+
+  if(mode==='edit'){
+    $('user-modal-body').innerHTML=`
+      <div class="form-group"><label class="form-label">Full Name</label>
+        <input id="um-name" value="${esc(u?.full_name||'')}"></div>
+      <div class="form-group"><label class="form-label">Company Name</label>
+        <input id="um-co" value="${esc(u?.company_name||'')}"></div>
+      <div class="form-group"><label class="form-label">Phone</label>
+        <input id="um-ph" value="${esc(u?.phone||'')}"></div>
+      <div class="form-group"><label class="form-label">Email (display only — cannot change auth email here)</label>
+        <input value="${esc(u?.email||'')}" disabled style="opacity:.5"></div>
+      <div class="form-group"><label class="form-label">Role</label>
+        <select id="um-role">
+          <option value="user"  ${(u?.role||'user')==='user' ?'selected':''}>User</option>
+          <option value="admin" ${u?.role==='admin'?'selected':''}>Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label>
+        <textarea id="um-notes" style="min-height:60px">${esc(u?.notes||'')}</textarea>
+      </div>`
+  }
+
+  if(mode==='password'){
+    $('user-modal-body').innerHTML=`
+      <div style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:10px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:500;color:var(--txt)">${esc(u?.full_name||u?.email||'User')}</div>
+        <div style="font-size:11px;color:var(--txt3)">${esc(u?.email||'')}</div>
+      </div>
+      <div class="form-group"><label class="form-label">New Password *</label>
+        <input id="um-pw1" type="password" placeholder="Min 8 characters"></div>
+      <div class="form-group"><label class="form-label">Confirm New Password *</label>
+        <input id="um-pw2" type="password" placeholder="Repeat password"></div>
+      ${u?.id===USER.id
+        ? '<div style="font-size:11px;color:var(--grn)">✓ Updating your own password — takes effect immediately.</div>'
+        : '<div style="font-size:11px;color:var(--txt3);line-height:1.6">⚠ You can only reset your own password from the frontend. To reset another user\'s password, go to your <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--gold)">Supabase dashboard</a> → Authentication → Users → find the user → Send password reset email.</div>'
+      }`
+  }
+
+  $('user-modal-bg').style.display='flex'
+  setTimeout(()=>$('um-name')?.focus()||$('um-email')?.focus()||$('um-pw1')?.focus(),80)
+}
+
+async function saveUserModal(){
+  const btn=$('user-save-btn')
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>'
+
+  try{
+    if(USER_MODAL_MODE==='add'){
+      const name  = $('um-name').value.trim()
+      const email = $('um-email').value.trim()
+      const pw    = $('um-pw').value
+      const co    = $('um-co').value.trim()
+      const role  = $('um-role').value
+      if(!name||!email||!pw){ toast('Name, email and password are required','err'); return }
+      if(pw.length<8){ toast('Password must be at least 8 characters','err'); return }
+      // Create auth user via signUp
+      const {data, error:signUpErr} = await db.auth.signUp({
+        email, password:pw,
+        options:{ data:{ full_name:name } }
+      })
+      if(signUpErr) throw signUpErr
+      // Update profile with extra fields
+      if(data.user){
+        await db.from('profiles').update({
+          full_name:name, company_name:co||null, role, is_active:true
+        }).eq('id', data.user.id)
+      }
+      toast('User created ✓')
+    }
+
+    else if(USER_MODAL_MODE==='edit'){
+      const upd={
+        full_name:    $('um-name').value.trim(),
+        company_name: $('um-co').value.trim(),
+        phone:        $('um-ph').value.trim(),
+        role:         $('um-role').value,
+        notes:        $('um-notes').value.trim(),
+      }
+      const {error}=await db.from('profiles').update(upd).eq('id',USER_MODAL_ID)
+      if(error) throw error
+      toast('User updated ✓')
+    }
+
+    else if(USER_MODAL_MODE==='password'){
+      // Can only update own password from frontend
+      if(USER_MODAL_ID !== USER.id){
+        toast('Use Supabase dashboard to reset other users\' passwords','err')
+        return
+      }
+      const pw1=$('um-pw1').value, pw2=$('um-pw2').value
+      if(!pw1||pw1.length<8){ toast('Password must be at least 8 characters','err'); return }
+      if(pw1!==pw2){ toast('Passwords do not match','err'); return }
+      const {error}=await db.auth.updateUser({password:pw1})
+      if(error) throw error
+      toast('Password updated ✓')
+    }
+
+    closeUserModal()
+    await renderUsersPanel()
+  }catch(e){
+    toast('Error: '+e.message,'err')
+  }finally{
+    btn.disabled=false; btn.textContent='Save'
+  }
+}
+
+async function toggleUserActive(id, currentlyActive){
+  const action = currentlyActive ? 'deactivate' : 'activate'
+  if(!confirm(`${currentlyActive?'Deactivate':'Activate'} this user? They will ${currentlyActive?'lose':'regain'} access.`)) return
+  const {error}=await db.from('profiles').update({is_active:!currentlyActive}).eq('id',id)
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast(`User ${action}d ✓`)
+  renderUsersPanel()
+}
+
+function closeUserModalBg(e){ if(e.target===$('user-modal-bg')) closeUserModal() }
+function closeUserModal(){
+  $('user-modal-bg').style.display='none'
+  USER_MODAL_MODE=null; USER_MODAL_ID=null
+  const btn=$('user-save-btn'); btn.disabled=false; btn.textContent='Save'
+}
+
+// Track own last_login on boot
+async function updateLastLogin(){
+  if(!USER) return
+  await db.from('profiles').update({last_login:new Date().toISOString()}).eq('id',USER.id)
 }
 
 // ═══════════════════════════════════════════════════
