@@ -508,13 +508,25 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   #mobile-back-btn { display: none !important; }
   #mobile-theme-btn { display: none !important; }
 }
-/* Searchable dropdown */
+/* Quotation tab layout with room side panel */
+.quot-layout{display:grid;grid-template-columns:1fr 260px;gap:14px;align-items:start}
+.quot-main{min-width:0}
+.room-side-panel{background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:14px;position:sticky;top:0}
+.room-side-title{font-family:var(--ff-h);font-size:15px;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
+.room-side-empty{font-size:11px;color:var(--txt3);text-align:center;padding:20px 0}
+.room-side-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--bdr2);font-size:11px}
+.room-side-row:last-child{border-bottom:none}
+.room-side-lbl{color:var(--txt3)}
+.room-side-val{font-weight:500;color:var(--txt)}
+.room-side-wall{margin-top:8px;background:var(--s2);border-radius:5px;padding:8px 10px}
+.room-side-wall-name{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+@media(max-width:900px){.quot-layout{grid-template-columns:1fr}.room-side-panel{position:static}}
 .srch-wrap{position:relative;width:100%;min-width:0}
 .srch-inp{width:100%;padding:3px 6px;font-size:11px;background:var(--s1);border:1px solid var(--bdr);border-radius:4px;color:var(--txt);font-family:var(--ff-b)}
 .srch-inp:focus{border-color:var(--gold);outline:none}
-.srch-list{position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--gold);border-radius:4px;z-index:300;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none}
+.srch-list{position:fixed;background:var(--s1);border:1px solid var(--gold);border-radius:4px;z-index:9000;max-height:220px;overflow-y:auto;box-shadow:0 6px 24px rgba(0,0,0,.18);display:none;min-width:160px}
 .srch-list.open{display:block}
-.srch-opt{padding:6px 8px;font-size:11px;cursor:pointer;color:var(--txt);border-bottom:1px solid var(--bdr2)}
+.srch-opt{padding:7px 10px;font-size:11px;cursor:pointer;color:var(--txt);border-bottom:1px solid var(--bdr2)}
 .srch-opt:last-child{border-bottom:none}
 .srch-opt:hover,.srch-opt.hi{background:var(--s3);color:var(--gold)}
 .srch-empty{padding:8px;font-size:11px;color:var(--txt3);text-align:center}
@@ -669,28 +681,40 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
             <button class="btn-primary" onclick="addItem()">+ Add Line</button>
           </div>
         </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:22px">#</th>
-              <th style="width:90px">Room</th>
-              <th style="width:110px">Trade</th>
-              <th style="width:135px">Material / Spec</th>
-              <th style="width:165px">Description</th>
-              <th class="r" style="width:60px">Qty</th>
-              <th style="width:58px">Unit</th>
-              <th class="r" style="width:76px">Cost/u</th>
-              <th class="r" style="width:76px">Rate/u</th>
-              <th class="r" style="width:82px">Tot.Cost</th>
-              <th class="r" style="width:82px">Tot.Rev</th>
-              <th class="r" style="width:50px">GP%</th>
-              <th style="width:26px"></th>
-            </tr></thead>
-            <tbody id="items-tbody"></tbody>
-            <tfoot id="items-tfoot"></tfoot>
-          </table>
+        <div class="quot-layout">
+          <!-- Main table -->
+          <div class="quot-main">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th style="width:22px">#</th>
+                  <th style="width:90px">Room</th>
+                  <th style="width:110px">Trade</th>
+                  <th style="width:135px">Material / Spec</th>
+                  <th style="width:165px">Description</th>
+                  <th class="r" style="width:60px">Qty</th>
+                  <th style="width:58px">Unit</th>
+                  <th class="r" style="width:76px">Cost/u</th>
+                  <th class="r" style="width:76px">Rate/u</th>
+                  <th class="r" style="width:82px">Tot.Cost</th>
+                  <th class="r" style="width:82px">Tot.Rev</th>
+                  <th class="r" style="width:50px">GP%</th>
+                  <th style="width:26px"></th>
+                </tr></thead>
+                <tbody id="items-tbody"></tbody>
+                <tfoot id="items-tfoot"></tfoot>
+              </table>
+            </div>
+            <div class="totals-bar" id="totals-bar"></div>
+          </div>
+          <!-- Room side panel -->
+          <div class="room-side-panel" id="room-side-panel">
+            <div class="room-side-title">Room Details</div>
+            <div class="room-side-empty" id="room-side-content">
+              Select a room in the table to see its dimensions
+            </div>
+          </div>
         </div>
-        <div class="totals-bar" id="totals-bar"></div>
       </div>
 
       <!-- TRADES VIEW TAB -->
@@ -1624,7 +1648,8 @@ async function updateRoom(id,field,value){
 function addWall(roomId){
   ROOMS=ROOMS.map(r=>{
     if(r.id!==roomId) return r
-    const walls=[...(r.walls||[]),{name:'Wall '+((r.walls||[]).length+1),length:r.length||3,height:2.6}]
+    const defaultLen = parseFloat(r.length)||3
+    const walls=[...(r.walls||[]),{name:'Wall '+((r.walls||[]).length+1),length:defaultLen,height:2.6}]
     return {...r, walls}
   })
   saveWallsDebounced(roomId)
@@ -1634,7 +1659,12 @@ function addWall(roomId){
 function updateWall(roomId,idx,field,value){
   ROOMS=ROOMS.map(r=>{
     if(r.id!==roomId) return r
-    const walls=(r.walls||[]).map((w,i)=>i===idx?{...w,[field]:field==='name'?value:parseFloat(value)||0}:w)
+    const walls=(r.walls||[]).map((w,i)=>{
+      if(i!==idx) return w
+      if(field==='name') return {...w, name:value}
+      const num = (value===''||value===null) ? 0 : (parseFloat(value)||0)
+      return {...w, [field]:num}
+    })
     return {...r, walls}
   })
   updateRoomBadge(roomId)
@@ -1890,7 +1920,56 @@ async function updateItem(id,field,rawVal){
   })
 }
 
-// Update only the 3 computed read-only cells in a row — no inputs touched
+// ── Room side panel ─────────────────────────────────
+function showRoomPanel(roomName){
+  const el = document.getElementById('room-side-content')
+  if(!el) return
+  if(!roomName){
+    el.innerHTML='<div class="room-side-empty">Select a room in the table to see its dimensions</div>'
+    return
+  }
+  const r = ROOMS.find(x=>x.name===roomName)
+  if(!r){
+    el.innerHTML=`<div class="room-side-empty">Room "${roomName}" not found in Rooms tab</div>`
+    return
+  }
+  const fa  = getArea(r)
+  const wa  = getWallArea(r)
+  const fBuf= withBuffer(fa.sqft)
+  const wBuf= withBuffer(wa.sqft)
+  const walls = r.walls||[]
+
+  const wallRows = walls.map(w=>{
+    const l=parseFloat(w.length)||0, h=parseFloat(w.height)||0
+    const wSqm = r.unit==='m' ? l*h : (l/3.281)*h
+    const wSqft= +(wSqm*SQM_TO_SQFT).toFixed(1)
+    return `<div class="room-side-wall">
+      <div class="room-side-wall-name">${esc(w.name||'Wall')}</div>
+      <div class="room-side-row"><span class="room-side-lbl">L × H</span><span class="room-side-val">${w.length||0} ${r.unit==='m'?'m':'ft'} × ${w.height||0} m</span></div>
+      <div class="room-side-row"><span class="room-side-lbl">Area</span><span class="room-side-val">${wSqft} sqft</span></div>
+    </div>`
+  }).join('')
+
+  el.innerHTML=`
+    <div class="room-side-row"><span class="room-side-lbl">Dimensions</span>
+      <span class="room-side-val">${r.length||0} × ${r.width||0} ${r.unit==='m'?'m':'ft'}</span></div>
+    <div class="room-side-row"><span class="room-side-lbl">Floor area</span>
+      <span class="room-side-val">${fmtN(fa.sqm,2)} sqm</span></div>
+    <div class="room-side-row"><span class="room-side-lbl"></span>
+      <span class="room-side-val">${fmtN(fa.sqft,1)} sqft</span></div>
+    <div class="room-side-row" style="color:var(--grn)"><span class="room-side-lbl">+10% buffer</span>
+      <span style="font-weight:600;color:var(--grn)">${fBuf} sqft</span></div>
+    ${walls.length?`
+    <div style="height:1px;background:var(--bdr);margin:8px 0"></div>
+    <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Walls</div>
+    ${wallRows}
+    <div class="room-side-row" style="margin-top:6px"><span class="room-side-lbl">Total wall</span>
+      <span class="room-side-val">${fmtN(wa.sqft,1)} sqft</span></div>
+    <div class="room-side-row" style="color:var(--grn)"><span class="room-side-lbl">+10% buffer</span>
+      <span style="font-weight:600;color:var(--grn)">${wBuf} sqft</span></div>
+    `:'<div style="font-size:10px;color:var(--txt3);margin-top:8px">No walls added for this room</div>'}
+  `
+}
 function updateItemRowCells(id){
   const item=ITEMS.find(i=>i.id===id)
   if(!item) return
@@ -2470,6 +2549,22 @@ function sdOpen(uid){
   const list=document.getElementById('sl_'+uid)
   const inp =document.getElementById('si_'+uid)
   if(!list||!inp) return
+
+  // Position the fixed dropdown aligned to the input
+  const rect=inp.getBoundingClientRect()
+  list.style.top   = (rect.bottom + 2) + 'px'
+  list.style.left  = rect.left + 'px'
+  list.style.width = Math.max(rect.width, 180) + 'px'
+
+  // Flip above if not enough space below
+  const spaceBelow = window.innerHeight - rect.bottom
+  if(spaceBelow < 240 && rect.top > 240){
+    list.style.top    = 'auto'
+    list.style.bottom = (window.innerHeight - rect.top + 2) + 'px'
+  } else {
+    list.style.bottom = 'auto'
+  }
+
   // Save current label so Escape can restore it, then clear so full list shows
   inp.dataset.prev=inp.value
   inp.value=''
@@ -2525,21 +2620,41 @@ function sdPick(uid,el){
   const list=document.getElementById('sl_'+uid)
   if(inp) inp.value=el.dataset.l
   if(list) list.classList.remove('open')
-  // Update the item via the standard updateItem function
   const iid=el.dataset.iid, field=el.dataset.field, val=el.dataset.v
   if(iid&&field) updateItem(iid, field, val)
+  // Show room panel when a room is selected
+  if(field==='room_name') showRoomPanel(val)
 }
 document.addEventListener('click', e=>{
   if(!e.target.closest('.srch-wrap')){
     document.querySelectorAll('.srch-list.open').forEach(el=>{
       el.classList.remove('open')
-      // Restore the input label for the dropdown we just closed
-      const uid = el.id.replace('sl_','')
-      const inp = document.getElementById('si_'+uid)
+      const uid=el.id.replace('sl_','')
+      const inp=document.getElementById('si_'+uid)
       if(inp && inp.dataset.prev!==undefined && inp.value==='') inp.value=inp.dataset.prev
     })
   }
 })
+
+// Reposition fixed dropdown on scroll/resize so it stays aligned to its input
+function repositionOpenDropdowns(){
+  document.querySelectorAll('.srch-list.open').forEach(el=>{
+    const uid=el.id.replace('sl_','')
+    const inp=document.getElementById('si_'+uid)
+    if(!inp) return
+    const rect=inp.getBoundingClientRect()
+    el.style.left=rect.left+'px'
+    el.style.width=Math.max(rect.width,180)+'px'
+    const spaceBelow=window.innerHeight-rect.bottom
+    if(spaceBelow<240&&rect.top>240){
+      el.style.top='auto'; el.style.bottom=(window.innerHeight-rect.top+2)+'px'
+    } else {
+      el.style.top=(rect.bottom+2)+'px'; el.style.bottom='auto'
+    }
+  })
+}
+window.addEventListener('scroll', repositionOpenDropdowns, true)
+window.addEventListener('resize', repositionOpenDropdowns)
 
 let DB_SEL_TRADE = null
 let CRUD_MODE    = null
