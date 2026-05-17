@@ -511,7 +511,11 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 /* Quotation tab layout with room side panel */
 .quot-layout{display:grid;grid-template-columns:1fr 260px;gap:14px;align-items:start}
 .quot-main{min-width:0}
-.room-side-panel{background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:14px;position:sticky;top:0}
+.room-side-panel{
+  background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:14px;
+  position:sticky;top:12px;   /* sticky within the scrolling content-area */
+  max-height:calc(100vh - 180px);overflow-y:auto;
+}
 .room-side-title{font-family:var(--ff-h);font-size:15px;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
 .room-side-empty{font-size:11px;color:var(--txt3);text-align:center;padding:20px 0}
 .room-side-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--bdr2);font-size:11px}
@@ -520,7 +524,19 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 .room-side-val{font-weight:500;color:var(--txt)}
 .room-side-wall{margin-top:8px;background:var(--s2);border-radius:5px;padding:8px 10px}
 .room-side-wall-name{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-@media(max-width:900px){.quot-layout{grid-template-columns:1fr}.room-side-panel{position:static}}
+/* Sticky Add Line bar at bottom of quotation tab */
+.sticky-add-bar{
+  position:sticky;bottom:0;left:0;right:0;
+  background:var(--s1);border-top:1px solid var(--bdr);
+  padding:10px 0;margin-top:4px;
+  display:flex;justify-content:flex-end;gap:8px;
+  z-index:50;
+}
+@media(max-width:900px){
+  .quot-layout{grid-template-columns:1fr}
+  .room-side-panel{position:static;max-height:none}
+  .sticky-add-bar{padding:8px 0}
+}
 .srch-wrap{position:relative;width:100%;min-width:0}
 .srch-inp{width:100%;padding:3px 6px;font-size:11px;background:var(--s1);border:1px solid var(--bdr);border-radius:4px;color:var(--txt);font-family:var(--ff-b)}
 .srch-inp:focus{border-color:var(--gold);outline:none}
@@ -678,7 +694,6 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
           <div><div class="sec-title">Quotation Table</div><div class="sec-sub">Internal view — all margins visible</div></div>
           <div class="sec-acts">
             <button class="btn-ghost no-print" onclick="exportCSV()">↓ Export CSV</button>
-            <button class="btn-primary" onclick="addItem()">+ Add Line</button>
           </div>
         </div>
         <div class="quot-layout">
@@ -706,12 +721,16 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               </table>
             </div>
             <div class="totals-bar" id="totals-bar"></div>
+            <!-- Sticky Add Line bar -->
+            <div class="sticky-add-bar no-print">
+              <button class="btn-primary" onclick="addItem()">+ Add Line</button>
+            </div>
           </div>
           <!-- Room side panel -->
           <div class="room-side-panel" id="room-side-panel">
             <div class="room-side-title">Room Details</div>
-            <div class="room-side-empty" id="room-side-content">
-              Select a room in the table to see its dimensions
+            <div id="room-side-content">
+              <div class="room-side-empty">Select a room in the table to see its dimensions</div>
             </div>
           </div>
         </div>
