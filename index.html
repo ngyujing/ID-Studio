@@ -2465,16 +2465,35 @@ function srchDrop(opts, currentVal, itemId, field, placeholder){
 }
 
 function sdOpen(uid){
+  // Close any other open dropdowns
   document.querySelectorAll('.srch-list.open').forEach(el=>{ if(el.id!=='sl_'+uid) el.classList.remove('open') })
   const list=document.getElementById('sl_'+uid)
-  if(list){ list.classList.add('open'); sdFilter(uid) }
+  const inp =document.getElementById('si_'+uid)
+  if(!list||!inp) return
+  // Save current label so Escape can restore it, then clear so full list shows
+  inp.dataset.prev=inp.value
+  inp.value=''
+  list.classList.add('open')
+  sdShowAll(uid)
+  inp.select()
 }
+
+function sdShowAll(uid){
+  const list=document.getElementById('sl_'+uid)
+  if(!list) return
+  list.querySelectorAll('.srch-opt').forEach(el=>el.style.display='')
+  const empty=list.querySelector('.srch-empty')
+  if(empty) empty.remove()
+}
+
 function sdFilter(uid){
   const inp=document.getElementById('si_'+uid)
   const list=document.getElementById('sl_'+uid)
   if(!inp||!list) return
   list.classList.add('open')
   const q=inp.value.toLowerCase()
+  // If empty query show everything
+  if(!q){ sdShowAll(uid); return }
   let visible=0
   list.querySelectorAll('.srch-opt').forEach(el=>{
     const match=el.dataset.l.toLowerCase().includes(q)
@@ -2487,7 +2506,13 @@ function sdFilter(uid){
   } else if(empty) empty.remove()
 }
 function sdKey(e,uid){
-  if(e.key==='Escape'){ const l=document.getElementById('sl_'+uid); if(l) l.classList.remove('open') }
+  if(e.key==='Escape'){
+    const l=document.getElementById('sl_'+uid)
+    const inp=document.getElementById('si_'+uid)
+    if(l) l.classList.remove('open')
+    // Restore previous label on Escape
+    if(inp && inp.dataset.prev!==undefined) inp.value=inp.dataset.prev
+  }
   if(e.key==='Enter'){
     const list=document.getElementById('sl_'+uid)
     if(!list) return
@@ -2506,7 +2531,13 @@ function sdPick(uid,el){
 }
 document.addEventListener('click', e=>{
   if(!e.target.closest('.srch-wrap')){
-    document.querySelectorAll('.srch-list.open').forEach(el=>el.classList.remove('open'))
+    document.querySelectorAll('.srch-list.open').forEach(el=>{
+      el.classList.remove('open')
+      // Restore the input label for the dropdown we just closed
+      const uid = el.id.replace('sl_','')
+      const inp = document.getElementById('si_'+uid)
+      if(inp && inp.dataset.prev!==undefined && inp.value==='') inp.value=inp.dataset.prev
+    })
   }
 })
 
