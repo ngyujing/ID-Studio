@@ -1090,6 +1090,7 @@ const CX_LABELS     = {'1.0':'Basic','1.3':'Premium','1.6':'Luxury'}
 // ── STATE ────────────────────────────────────────────
 let USER=null, PROFILE=null, TRADES=[], MATS=[]
 let QUOTES=[], Q=null, ROOMS=[], ITEMS=[]
+let OWNER_MAP={}   // id → profile, used by admin dashboard
 let PROP_TYPE='hdb'
 let SETTINGS={ gst:9, validity:30 }   // loaded from profile on login
 let TIMERS={}, CUR_TAB='rooms'
@@ -1325,25 +1326,87 @@ function updateSidebarUser(){
 // ═══════════════════════════════════════════════════
 async function loadDashboard(){
   $('db-grid').innerHTML='<div class="empty-state"><span class="spinner"></span></div>'
-  const {data,error}=await db.from('v_quotation_summary')
-    .select('*').eq('user_id',USER.id).order('updated_at',{ascending:false})
+  const isAdmin = PROFILE?.role === 'admin'
+  let query = db.from('v_quotation_summary').select('*').order('updated_at',{ascending:false})
+  // Non-admins only see their own projects
+  if(!isAdmin) query = query.eq('user_id', USER.id)
+  const {data,error} = await query
   if(error){ toast('Failed to load projects','err'); return }
-  QUOTES=data||[]; renderDashboard()
+  QUOTES = data||[]
+  // For admin: fetch owner names so we can show who owns each project
+  if(isAdmin && QUOTES.length){
+    const ownerIds = [...new Set(QUOTES.map(q=>q.user_id))]
+    const {data:owners} = await db.from('profiles').select('id,full_name,company_name,email').in('id',ownerIds)
+    OWNER_MAP = {}
+    ;(owners||[]).forEach(o=>{ OWNER_MAP[o.id]=o })
+  } else {
+    OWNER_MAP = {}
+  }
+  renderDashboard()
 }
 
 function renderDashboard(){
+  const isAdmin = PROFILE?.role === 'admin'
   const grid=$('db-grid')
+
+  // Admin filter bar
+  let filterHtml = ''
+  if(isAdmin){
+    const allOwners = [...new Set(QUOTES.map(q=>q.user_id))]
+    const ownerOpts = allOwners.map(id=>{
+      const o = OWNER_MAP[id]||{}
+      const label = o.full_name||o.email||id.slice(0,8)
+      return `<option value="${esc(id)}">${esc(label)}</option>`
+    }).join('')
+    filterHtml = `
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--bdr);border-radius:8px">
+        <span style="font-size:11px;color:var(--txt3);font-weight:600">🔍 Filter:</span>
+        <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
+          <option value="">All Users (${QUOTES.length} projects)</option>
+          ${ownerOpts}
+        </select>
+        <select id="dash-filter-status" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <span style="font-size:10px;color:var(--txt3);margin-left:auto" id="dash-count"></span>
+      </div>`
+  }
+
   if(!QUOTES.length){
-    grid.innerHTML=`<div class="empty-state"><div class="es-icon">◇</div><p>No quotations yet.</p><button class="btn-primary mt-12" onclick="newQuote(this)">Create your first quotation</button></div>`
+    grid.innerHTML=(isAdmin?filterHtml:'')+`<div class="empty-state"><div class="es-icon">◇</div><p>No quotations yet.</p><button class="btn-primary mt-12" onclick="newQuote(this)">Create your first quotation</button></div>`
     return
   }
-  grid.innerHTML=QUOTES.map(q=>`
+
+  // Apply filters (admin only)
+  let filtered = QUOTES
+  if(isAdmin){
+    const ownerSel  = document.getElementById('dash-filter-owner')?.value
+    const statusSel = document.getElementById('dash-filter-status')?.value
+    if(ownerSel)  filtered = filtered.filter(q=>q.user_id===ownerSel)
+    if(statusSel) filtered = filtered.filter(q=>q.status===statusSel)
+  }
+
+  const cards = filtered.map(q=>{
+    const owner   = isAdmin && OWNER_MAP[q.user_id]
+    const ownerBadge = owner
+      ? `<div style="font-size:10px;color:var(--txt3);margin-top:2px;display:flex;align-items:center;gap:4px">
+           <span style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:1px 7px;font-size:9px">
+             👤 ${esc(owner.full_name||owner.email||'Unknown')}
+           </span>
+         </div>` : ''
+    const isOwn   = q.user_id === USER.id
+    return `
     <div class="db-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
         <div>
           <div class="db-ref">${esc(q.ref_number)}</div>
           <div class="db-proj">${esc(q.project_name)}</div>
           <div class="db-client">${esc(q.client_name||'No client set')}</div>
+          ${ownerBadge}
         </div>
         <span class="status-chip" style="color:${STATUS_COLORS[q.status]||'#6A6358'};border-color:${STATUS_COLORS[q.status]||'#6A6358'}">${q.status}</span>
       </div>
@@ -1355,12 +1418,18 @@ function renderDashboard(){
       <div class="db-foot">
         <span class="db-date">${fmtDate(q.updated_at)}</span>
         <div class="db-acts">
+          ${isAdmin&&!isOwn?`<span style="font-size:9px;color:var(--txt3);padding:2px 6px;border:1px solid var(--bdr);border-radius:3px">View only</span>`:''}
           <button class="btn-del" title="Duplicate" onclick="dupQuote('${q.id}')">⧉ Dup</button>
-          <button class="btn-del" title="Delete"    onclick="delQuote('${q.id}')">✕</button>
+          ${isOwn||isAdmin?`<button class="btn-del" title="Delete" onclick="delQuote('${q.id}')">✕</button>`:''}
           <button class="btn-primary" style="padding:4px 11px;font-size:11px" onclick="openQuote('${q.id}')">Open →</button>
         </div>
       </div>
-    </div>`).join('')
+    </div>`
+  }).join('')
+
+  grid.innerHTML = (isAdmin ? filterHtml : '') + (filtered.length ? cards : '<div class="empty-state"><p>No projects match this filter.</p></div>')
+  const countEl = document.getElementById('dash-count')
+  if(countEl) countEl.textContent = `${filtered.length} of ${QUOTES.length} projects`
 }
 
 async function newQuote(btn){
