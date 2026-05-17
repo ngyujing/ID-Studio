@@ -1818,13 +1818,13 @@ function renderRooms(){
     const wallTotalSqft = wa.sqft
     const wallBufSqft   = withBuffer(wallTotalSqft)
     const wallTotal=walls.length?`
-      <div class="wall-total-row" style="flex-direction:column;align-items:flex-start;gap:4px">
-        <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-          <span class="wall-total-lbl">Actual wall area</span>
+      <div class="wall-total-row" style="flex-direction:column;align-items:stretch;gap:3px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="wall-total-lbl">Wall total</span>
           <span class="wall-sqft wall-total-val">${fmtN(wallTotalSqft,1)} sqft</span>
         </div>
-        <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-          <span style="font-size:10px;color:var(--txt3)">+10% buffer (rounded up to nearest 10)</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px;border-top:1px dashed var(--bdr2)">
+          <span style="font-size:10px;color:var(--txt3)">+10% buffer</span>
           <span style="font-family:var(--ff-h);font-size:14px;color:var(--grn);font-weight:600">${wallBufSqft} sqft</span>
         </div>
       </div>`:''
@@ -1846,26 +1846,25 @@ function renderRooms(){
           <option value="ft" ${r.unit==='ft'?'selected':''}>ft</option>
         </select>
       </div>
-      <div class="area-badge" style="flex-direction:column;align-items:stretch;gap:4px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:10px;color:var(--txt3)">Actual floor area</div>
-          <div style="display:flex;gap:10px;align-items:baseline">
-            <div><span class="area-num floor-area-num">${fmtN(fa.sqm,2)}</span><span class="area-unit"> sqm</span></div>
-            <div style="width:1px;height:14px;background:var(--bdr)"></div>
-            <div><span class="area-num floor-area-num">${fmtN(floorSqft,1)}</span><span class="area-unit"> sqft</span></div>
+      <div class="area-badge" style="flex-direction:column;align-items:stretch;gap:3px">
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px">
+          <span style="font-size:10px;color:var(--txt3)">Floor</span>
+          <span></span>
+          <div style="display:flex;gap:8px;align-items:baseline">
+            <span><span class="area-num floor-area-num" style="font-size:15px">${fmtN(fa.sqm,2)}</span><span class="area-unit"> sqm</span></span>
+            <span style="color:var(--bdr2)">|</span>
+            <span><span class="area-num floor-area-num" style="font-size:15px">${fmtN(floorSqft,1)}</span><span class="area-unit"> sqft</span></span>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px;border-top:1px dashed var(--bdr2)">
-          <div style="font-size:10px;color:var(--txt3)">Dimensions in ${r.unit==='m'?'feet':'metres'}</div>
-          <div style="font-size:11px;color:var(--txt2)">
-            ${r.unit==='m'
-              ? `${fmtN((r.length||0)*3.281,1)} × ${fmtN((r.width||0)*3.281,1)} ft`
-              : `${fmtN((r.length||0)/3.281,2)} × ${fmtN((r.width||0)/3.281,2)} m`}
-          </div>
+          <span style="font-size:10px;color:var(--txt3)">In ${r.unit==='m'?'ft':'m'}</span>
+          <span style="font-size:11px;color:var(--txt2)">${r.unit==='m'
+            ? fmtN((r.length||0)*3.281,1)+' × '+fmtN((r.width||0)*3.281,1)+' ft'
+            : fmtN((r.length||0)/3.281,2)+' × '+fmtN((r.width||0)/3.281,2)+' m'}</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px;border-top:1px dashed var(--bdr2)">
-          <div style="font-size:10px;color:var(--txt3)">+10% buffer (↑ nearest 10)</div>
-          <div style="font-family:var(--ff-h);font-size:15px;color:var(--grn);font-weight:600">${floorBufSqft} sqft</div>
+          <span style="font-size:10px;color:var(--txt3)">+10% buffer</span>
+          <span style="font-family:var(--ff-h);font-size:14px;color:var(--grn);font-weight:600">${floorBufSqft} sqft</span>
         </div>
       </div>
       <div class="walls-section">
