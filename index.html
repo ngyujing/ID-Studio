@@ -599,7 +599,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <button class="sb-item" id="sb-settings" onclick="navTo('settings')">
         <span class="sb-icon">⚙</span>Settings
       </button>
-      <button class="sb-item" id="sb-users" onclick="navTo('users')">
+      <button class="sb-item" id="sb-users" onclick="navTo('users')" style="display:none">
         <span class="sb-icon">👥</span>Users
       </button>
     </nav>
@@ -1228,7 +1228,10 @@ function navTo(view){
   if(view==='calc')      initCalcs()
   if(view==='settings')  loadSettingsUI()
   if(view==='database')  renderDbPanel()
-  if(view==='users')     renderUsersPanel()
+  if(view==='users'){
+    if(PROFILE?.role!=='admin'){ toast('Admin access required','err'); return }
+    renderUsersPanel()
+  }
 }
 
 function mobileNavTo(view){
@@ -1361,6 +1364,9 @@ function updateSidebarUser(){
   $('sb-name').textContent=name
   $('sb-co').textContent  =co
   $('sb-av').textContent  =name[0].toUpperCase()
+  // Show Users page only for admins
+  const usersBtn=$('sb-users')
+  if(usersBtn) usersBtn.style.display=PROFILE?.role==='admin'?'flex':'none'
 }
 
 // ═══════════════════════════════════════════════════
@@ -1790,10 +1796,12 @@ function renderRooms(){
       </div>`:''
 
     const wallRows=walls.map((w,i)=>{
-      // per-wall area calc
       const l=parseFloat(w.length)||0, h=parseFloat(w.height)||0
-      const wallSqm = r.unit==='m' ? l*h : (l/3.281)*h
+      const wallSqm  = r.unit==='m' ? l*h : (l/3.281)*h
       const wallSqft = +(wallSqm*SQM_TO_SQFT).toFixed(1)
+      const lenConv  = r.unit==='m'
+        ? `(${fmtN(l*3.281,1)} ft)`
+        : `(${fmtN(l/3.281,2)} m)`
       return `
       <div style="margin-bottom:6px">
         <div class="wall-row" style="grid-template-columns:1fr 64px 64px 24px">
@@ -1803,9 +1811,8 @@ function renderRooms(){
           <button class="btn-del" style="padding:2px 5px" onclick="removeWall('${r.id}',${i})">✕</button>
         </div>
         ${l&&h?`<div style="font-size:10px;color:var(--txt3);text-align:right;padding:2px 28px 0 0">
-          ${esc(w.name||'Wall')} area: <strong style="color:var(--gold2)">${wallSqft} sqft</strong> (${wallSqm.toFixed(2)} sqm)
-        </div>`:''}
-      </div>`
+          L ${lenConv} &nbsp;·&nbsp; area: <strong style="color:var(--gold)">${wallSqft} sqft</strong> (${wallSqm.toFixed(2)} sqm)
+        </div>`:''}`
     }).join('')
 
     const wallTotalSqft = wa.sqft
@@ -1848,7 +1855,15 @@ function renderRooms(){
             <div><span class="area-num floor-area-num">${fmtN(floorSqft,1)}</span><span class="area-unit"> sqft</span></div>
           </div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px dashed var(--bdr2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px;border-top:1px dashed var(--bdr2)">
+          <div style="font-size:10px;color:var(--txt3)">Dimensions in ${r.unit==='m'?'feet':'metres'}</div>
+          <div style="font-size:11px;color:var(--txt2)">
+            ${r.unit==='m'
+              ? `${fmtN((r.length||0)*3.281,1)} × ${fmtN((r.width||0)*3.281,1)} ft`
+              : `${fmtN((r.length||0)/3.281,2)} × ${fmtN((r.width||0)/3.281,2)} m`}
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px;border-top:1px dashed var(--bdr2)">
           <div style="font-size:10px;color:var(--txt3)">+10% buffer (↑ nearest 10)</div>
           <div style="font-family:var(--ff-h);font-size:15px;color:var(--grn);font-weight:600">${floorBufSqft} sqft</div>
         </div>
