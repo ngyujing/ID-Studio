@@ -9,6 +9,7 @@
 <title>YJ Studio — Quotation Tool</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -724,6 +725,9 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <div id="V-client" style="display:none">
         <div class="sec-hd no-print">
           <div><div class="sec-title">Client Quotation View</div><div class="sec-sub">Clean branded output — all margins hidden</div></div>
+          <button class="btn-ghost no-print" onclick="exportClientExcel()" style="display:inline-flex;align-items:center;gap:6px">
+            <span>↓</span> Export Excel
+          </button>
           <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
         </div>
         <div id="client-doc"></div>
@@ -1551,7 +1555,7 @@ async function updateRoom(id,field,value){
 function addWall(roomId){
   ROOMS=ROOMS.map(r=>{
     if(r.id!==roomId) return r
-    const walls=[...(r.walls||[]),{name:'Wall '+((r.walls||[]).length+1),length:r.length||3,height:2.7}]
+    const walls=[...(r.walls||[]),{name:'Wall '+((r.walls||[]).length+1),length:r.length||3,height:2.6}]
     return {...r, walls}
   })
   saveWallsDebounced(roomId)
@@ -2981,6 +2985,200 @@ function closeUserModal(){
 async function updateLastLogin(){
   if(!USER) return
   await db.from('profiles').update({last_login:new Date().toISOString()}).eq('id',USER.id)
+}
+
+// ═══════════════════════════════════════════════════
+// EXPORT CLIENT QUOTATION TO EXCEL
+// ═══════════════════════════════════════════════════
+function exportClientExcel(){
+  if(!Q){ toast('No quotation open','err'); return }
+  if(typeof XLSX === 'undefined'){ toast('Excel library not loaded yet — try again in a moment','err'); return }
+
+  const cx        = Q.complexity || 1.0
+  const gstPct    = SETTINGS.gst / 100
+  const co        = PROFILE?.company_name || 'YJ Studio'
+  const uen       = PROFILE?.uen || ''
+  const phone     = PROFILE?.phone || ''
+  const dateStr   = fmtDate(Q.created_at || new Date())
+  const tSqm      = ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
+  const tSqft     = ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
+  const t         = calcTotals()
+  const gstAmt    = t.rev * gstPct
+  const grand     = t.rev + gstAmt
+  const propLabel = PROP_TYPE==='hdb'?'HDB':PROP_TYPE==='condo'?'Condo / Landed':'Commercial'
+
+  const wb = XLSX.utils.book_new()
+
+  // ── SHEET 1: QUOTATION SUMMARY ──────────────────
+  const summaryRows = []
+
+  // Header block
+  summaryRows.push([co, '', '', '', '', ''])
+  summaryRows.push(['INTERIOR DESIGN & RENOVATION', '', '', '', '', ''])
+  summaryRows.push([])
+  summaryRows.push(['QUOTATION', '', '', '', '', ''])
+  summaryRows.push(['Ref:', Q.ref_number, '', 'Date:', dateStr, ''])
+  summaryRows.push(['Validity:', `${SETTINGS.validity} days`, '', 'Property:', propLabel, ''])
+  summaryRows.push([])
+  summaryRows.push(['Prepared for:', Q.client_name||'—', '', '', '', ''])
+  summaryRows.push(['Project:', Q.project_name||'—', '', '', '', ''])
+  summaryRows.push(['Address:', Q.address||'—', '', '', '', ''])
+  summaryRows.push(['Total Area:', `${fmtN(tSqm,1)} sqm / ${fmtN(tSqft,0)} sqft`, '', '', '', ''])
+  summaryRows.push([])
+
+  // Summary of works
+  summaryRows.push(['SUMMARY OF WORKS', '', '', '', '', ''])
+  summaryRows.push(['No.', 'Trade / Scope of Works', '', '', 'Price (SGD)', ''])
+
+  // Build sorted trade groups (same logic as client view)
+  const grouped = {}
+  ITEMS.forEach(i=>{
+    const trade = TRADES.find(t=>t.id===i.trade_id)
+    const name  = trade?.name || 'Other Works'
+    if(!grouped[name]) grouped[name]={items:[],sort:trade?.sort_order??99}
+    grouped[name].items.push(i)
+  })
+  const sortedTrades = Object.entries(grouped).sort(([a,{sort:as}],[b,{sort:bs}])=>{
+    const ai=TRADE_ORDER.indexOf(a), bi=TRADE_ORDER.indexOf(b)
+    if(ai>-1&&bi>-1) return ai-bi
+    if(ai>-1) return -1; if(bi>-1) return 1
+    return as-bs
+  })
+
+  sortedTrades.forEach(([tradeName,{items}],idx)=>{
+    const trTotal = items.reduce((s,i)=>s+(i.client_rate||0)*(i.quantity||0)*cx,0)
+    summaryRows.push([idx+1, tradeName, '', '', trTotal>0?trTotal:'Inclusive', ''])
+  })
+
+  summaryRows.push([])
+  summaryRows.push(['', '', '', '', 'Sub-total', t.rev])
+  summaryRows.push(['', '', '', '', `GST (${SETTINGS.gst}%)`, gstAmt])
+  summaryRows.push(['', '', '', '', 'Grand Total (SGD)', grand])
+
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryRows)
+
+  // Column widths
+  ws1['!cols'] = [
+    {wch:14},{wch:36},{wch:14},{wch:14},{wch:18},{wch:14}
+  ]
+  // Merge header cells
+  ws1['!merges'] = [
+    {s:{r:0,c:0},e:{r:0,c:5}},
+    {s:{r:1,c:0},e:{r:1,c:5}},
+    {s:{r:3,c:0},e:{r:3,c:5}},
+    {s:{r:13,c:0},e:{r:13,c:5}},
+    {s:{r:14,c:1},e:{r:14,c:3}},
+  ]
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
+
+  // ── SHEET 2: DETAILED SCOPE ─────────────────────
+  const detailRows = []
+  detailRows.push(['DETAILED SCOPE OF WORKS'])
+  detailRows.push([Q.project_name, '', '', Q.client_name, '', ''])
+  detailRows.push([])
+
+  sortedTrades.forEach(([tradeName,{items}])=>{
+    // Merge lines with same spec + description + rate + unit (same as client view)
+    const merged = []
+    items.forEach(i=>{
+      const mat   = MATS.find(m=>m.id===i.material_id)
+      const spec  = mat?.name || i.description || ''
+      const desc  = i.description || ''
+      const rate  = (i.client_rate||0)*cx
+      const unit  = i.unit||''
+      const ex    = merged.find(m=>m.spec===spec&&m.desc===desc&&Math.abs(m.rate-rate)<0.001&&m.unit===unit)
+      if(ex){ ex.qty+=(i.quantity||0); ex.amount+=rate*(i.quantity||0); ex.rooms.push(i.room_name||'') }
+      else    merged.push({spec,desc,rate,unit,qty:i.quantity||0,amount:rate*(i.quantity||0),rooms:[i.room_name||'']})
+    })
+
+    const trTotal = items.reduce((s,i)=>s+(i.client_rate||0)*(i.quantity||0)*cx,0)
+    detailRows.push([tradeName.toUpperCase(), '', '', '', '', ''])
+    detailRows.push(['#','Specification','Description','Qty','Unit Rate (SGD)','Amount (SGD)'])
+    merged.forEach((m,idx)=>{
+      detailRows.push([
+        idx+1,
+        m.spec,
+        m.desc + (m.rooms.filter(Boolean).length ? ` [${m.rooms.filter(Boolean).join(', ')}]` : ''),
+        `${fmtN(m.qty,2)} ${m.unit}`,
+        m.rate,
+        m.amount
+      ])
+    })
+    detailRows.push(['','','','','Sub-total', trTotal])
+    detailRows.push([])
+  })
+
+  detailRows.push([])
+  detailRows.push(['','','','','Sub-total (before GST)', t.rev])
+  detailRows.push(['','','','',`GST (${SETTINGS.gst}%)`, gstAmt])
+  detailRows.push(['','','','','Grand Total (SGD)', grand])
+
+  const ws2 = XLSX.utils.aoa_to_sheet(detailRows)
+  ws2['!cols'] = [{wch:5},{wch:30},{wch:40},{wch:12},{wch:16},{wch:16}]
+  XLSX.utils.book_append_sheet(wb, ws2, 'Detailed Scope')
+
+  // ── SHEET 3: ROOMS ──────────────────────────────
+  const roomRows = [
+    ['ROOM DIMENSIONS', '', '', '', ''],
+    ['Room', 'Floor L', 'Floor W', 'Unit', 'Floor sqm', 'Floor sqft', 'Wall sqm', 'Wall sqft'],
+  ]
+  ROOMS.forEach(r=>{
+    const fa=getArea(r), wa=getWallArea(r)
+    roomRows.push([r.name, r.length, r.width, r.unit, fa.sqm, fa.sqft, wa.sqm, wa.sqft])
+    ;(r.walls||[]).forEach(w=>{
+      const wSqm  = r.unit==='m'?(parseFloat(w.length)||0)*(parseFloat(w.height)||0):(parseFloat(w.length)||0)/3.281*(parseFloat(w.height)||0)
+      roomRows.push([`  └ ${w.name||'Wall'}`, w.length, w.height, r.unit==='m'?'m (H=m)':'ft (H=m)', '', '', +wSqm.toFixed(2), +(wSqm*SQM_TO_SQFT).toFixed(1)])
+    })
+  })
+  roomRows.push([])
+  const tFSqm=ROOMS.reduce((s,r)=>s+getArea(r).sqm,0)
+  const tFSqft=ROOMS.reduce((s,r)=>s+getArea(r).sqft,0)
+  const tWSqm=ROOMS.reduce((s,r)=>s+getWallArea(r).sqm,0)
+  const tWSqft=ROOMS.reduce((s,r)=>s+getWallArea(r).sqft,0)
+  roomRows.push(['TOTAL','','','', +tFSqm.toFixed(2), +tFSqft.toFixed(1), +tWSqm.toFixed(2), +tWSqft.toFixed(1)])
+  const ws3 = XLSX.utils.aoa_to_sheet(roomRows)
+  ws3['!cols'] = [{wch:22},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12}]
+  XLSX.utils.book_append_sheet(wb, ws3, 'Room Dimensions')
+
+  // ── SHEET 4: INTERNAL (cost + margin — not for client) ──
+  const internalRows = [
+    ['INTERNAL — CONTRACTOR COSTS & MARGINS (CONFIDENTIAL)', '', '', '', '', '', '', ''],
+    ['Room','Trade','Material / Spec','Description','Qty','Unit','Cost/u','Client Rate/u',`Cost/u (×${cx})`, 'Total Cost','Total Revenue','GP (SGD)','GP%'],
+  ]
+  ITEMS.forEach(item=>{
+    const trade = TRADES.find(t=>t.id===item.trade_id)
+    const mat   = MATS.find(m=>m.id===item.material_id)
+    const tc    = (item.cost_rate||0)*(item.quantity||0)
+    const tr    = (item.client_rate||0)*(item.quantity||0)*cx
+    const gp    = tr - tc
+    const gpPct = tr>0?gp/tr*100:0
+    internalRows.push([
+      item.room_name||'',
+      trade?.name||'',
+      mat?.name||'',
+      item.description||'',
+      item.quantity||0,
+      item.unit||'',
+      item.cost_rate||0,
+      item.client_rate||0,
+      +((item.client_rate||0)*cx).toFixed(2),
+      +tc.toFixed(2),
+      +tr.toFixed(2),
+      +gp.toFixed(2),
+      +gpPct.toFixed(1)
+    ])
+  })
+  internalRows.push([])
+  internalRows.push(['','','','','','','','','','Total Cost','Total Revenue','Gross Profit','Margin %'])
+  internalRows.push(['','','','','','','','','',+t.cost.toFixed(2),+t.rev.toFixed(2),+t.gp.toFixed(2),+t.margin.toFixed(1)])
+  const ws4 = XLSX.utils.aoa_to_sheet(internalRows)
+  ws4['!cols'] = [{wch:16},{wch:22},{wch:28},{wch:32},{wch:8},{wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:14},{wch:12},{wch:8}]
+  XLSX.utils.book_append_sheet(wb, ws4, 'Internal Costs')
+
+  // Save file
+  const fileName = `${Q.ref_number||'Quotation'}_${(Q.project_name||'').replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`
+  XLSX.writeFile(wb, fileName)
+  toast(`Exported: ${fileName}`)
 }
 
 // ═══════════════════════════════════════════════════
