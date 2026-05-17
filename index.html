@@ -140,8 +140,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .status-chip{font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;border:1px solid;border-radius:10px;padding:2px 7px;white-space:nowrap}
 
 /* ROOMS */
-.rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:14px}
-.room-card{background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px;margin-bottom:16px;width:100%}
+.room-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden}
 .room-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .room-name-inp{background:transparent;border:none;color:var(--gold2);font-family:var(--ff-h);font-size:15px;font-weight:500;border-bottom:1px solid var(--bdr);padding:1px 2px;border-radius:0;width:calc(100% - 34px)}
 .room-name-inp:focus{outline:none;border-bottom-color:var(--gold)}
