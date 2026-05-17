@@ -694,6 +694,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
           <div><div class="sec-title">Quotation Table</div><div class="sec-sub">Internal view — all margins visible</div></div>
           <div class="sec-acts">
             <button class="btn-ghost no-print" onclick="exportCSV()">↓ Export CSV</button>
+            <button class="btn-primary" onclick="addItem()">+ Add Line</button>
           </div>
         </div>
         <div class="quot-layout">
@@ -721,16 +722,15 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               </table>
             </div>
             <div class="totals-bar" id="totals-bar"></div>
-            <!-- Sticky Add Line bar -->
-            <div class="sticky-add-bar no-print">
-              <button class="btn-primary" onclick="addItem()">+ Add Line</button>
-            </div>
           </div>
-          <!-- Room side panel -->
-          <div class="room-side-panel" id="room-side-panel">
-            <div class="room-side-title">Room Details</div>
-            <div id="room-side-content">
-              <div class="room-side-empty">Select a room in the table to see its dimensions</div>
+          <!-- Sticky right column: Add Line + Room Details -->
+          <div style="position:sticky;top:12px;display:flex;flex-direction:column;gap:10px;align-self:start">
+            <button class="btn-primary w-full no-print" onclick="addItem()" style="padding:10px;font-size:12px">+ Add Line</button>
+            <div class="room-side-panel" id="room-side-panel" style="position:static">
+              <div class="room-side-title">Room Details</div>
+              <div id="room-side-content">
+                <div class="room-side-empty">Select a room in the table to see its dimensions</div>
+              </div>
             </div>
           </div>
         </div>
