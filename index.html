@@ -512,13 +512,34 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   #mobile-theme-btn { display: none !important; }
 }
 /* Quotation tab layout with room side panel */
-.quot-layout{display:grid;grid-template-columns:1fr 260px;gap:14px;align-items:start}
+.quot-layout{display:block}
 .quot-main{min-width:0}
-.room-side-panel{
-  background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:14px;
-  position:sticky;top:12px;   /* sticky within the scrolling content-area */
-  max-height:calc(100vh - 180px);overflow-y:auto;
+/* Floating Room Details card — fixed to viewport */
+#room-float-card{
+  position:fixed;
+  bottom:24px;
+  right:24px;
+  width:260px;
+  background:var(--s1);
+  border:1px solid var(--gold);
+  border-radius:10px;
+  padding:14px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);
+  z-index:400;
+  max-height:70vh;
+  overflow-y:auto;
+  display:none;  /* shown only when on quotation tab */
 }
+#room-float-card.visible{display:block}
+#room-float-drag-handle{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr);
+  cursor:grab;user-select:none;
+}
+#room-float-drag-handle:active{cursor:grabbing}
+.room-float-title{font-family:var(--ff-h);font-size:14px;color:var(--gold)}
+.room-float-close{background:transparent;border:none;color:var(--txt3);font-size:14px;cursor:pointer;padding:0 2px;line-height:1}
+.room-float-close:hover{color:var(--red)}
 .room-side-title{font-family:var(--ff-h);font-size:15px;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
 .room-side-empty{font-size:11px;color:var(--txt3);text-align:center;padding:20px 0}
 .room-side-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--bdr2);font-size:11px}
@@ -527,18 +548,10 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 .room-side-val{font-weight:500;color:var(--txt)}
 .room-side-wall{margin-top:8px;background:var(--s2);border-radius:5px;padding:8px 10px}
 .room-side-wall-name{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-/* Sticky Add Line bar at bottom of quotation tab */
-.sticky-add-bar{
-  position:sticky;bottom:0;left:0;right:0;
-  background:var(--s1);border-top:1px solid var(--bdr);
-  padding:10px 0;margin-top:4px;
-  display:flex;justify-content:flex-end;gap:8px;
-  z-index:50;
-}
-@media(max-width:900px){
-  .quot-layout{grid-template-columns:1fr}
-  .room-side-panel{position:static;max-height:none}
-  .sticky-add-bar{padding:8px 0}
+@media(max-width:768px){
+  #room-float-card{
+    bottom:72px;right:10px;left:10px;width:auto;
+  }
 }
 .srch-wrap{position:relative;width:100%;min-width:0}
 .srch-inp{width:100%;padding:3px 6px;font-size:11px;background:var(--s1);border:1px solid var(--bdr);border-radius:4px;color:var(--txt);font-family:var(--ff-b)}
@@ -701,7 +714,6 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
           </div>
         </div>
         <div class="quot-layout">
-          <!-- Main table -->
           <div class="quot-main">
             <div class="tbl-wrap">
               <table>
@@ -725,15 +737,6 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
               </table>
             </div>
             <div class="totals-bar" id="totals-bar"></div>
-          </div>
-          <!-- Sticky right column: Room Details only -->
-          <div style="position:sticky;top:12px;display:flex;flex-direction:column;gap:10px;align-self:start">
-            <div class="room-side-panel" id="room-side-panel" style="position:static">
-              <div class="room-side-title">Room Details</div>
-              <div id="room-side-content">
-                <div class="room-side-empty">Select a room in the table to see its dimensions</div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1034,6 +1037,17 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   </div>
 </div>
 
+<!-- FLOATING ROOM DETAILS CARD -->
+<div id="room-float-card">
+  <div id="room-float-drag-handle">
+    <span class="room-float-title">📐 Room Details</span>
+    <button class="room-float-close" onclick="hideRoomFloat()" title="Close">✕</button>
+  </div>
+  <div id="room-side-content">
+    <div class="room-side-empty">Select a room in the table to see its dimensions</div>
+  </div>
+</div>
+
 <div id="toast-wrap"></div>
 
 <!-- ══════════════════════════════════════════════════════
@@ -1252,12 +1266,64 @@ function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'))
   $('tb-'+tab)?.classList.add('active')
   navTo(tab)
+  // Show/hide floating room card
+  const fc=$('room-float-card')
+  if(fc) fc.classList.toggle('visible', tab==='items')
   if(tab==='items')     renderItemsTable()
   if(tab==='trades')    renderTrades()
   if(tab==='moodboard') renderMoodboard()
   if(tab==='gantt')     renderGantt()
   if(tab==='client')    renderClientView()
 }
+
+function hideRoomFloat(){
+  const fc=$('room-float-card')
+  if(fc) fc.classList.remove('visible')
+}
+
+// ── Drag the floating card ─────────────────────────
+;(function initFloatDrag(){
+  let dragging=false, ox=0, oy=0, startR=0, startB=0
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const handle=document.getElementById('room-float-drag-handle')
+    const card  =document.getElementById('room-float-card')
+    if(!handle||!card) return
+    handle.addEventListener('mousedown', e=>{
+      if(e.target.classList.contains('room-float-close')) return
+      dragging=true
+      const rect=card.getBoundingClientRect()
+      // Store offset from pointer to card edges
+      ox = window.innerWidth  - rect.right  + (rect.right - e.clientX)
+      oy = window.innerHeight - rect.bottom + (rect.bottom - e.clientY)
+      startR = window.innerWidth  - rect.right
+      startB = window.innerHeight - rect.bottom
+      document.body.style.userSelect='none'
+    })
+    document.addEventListener('mousemove', e=>{
+      if(!dragging) return
+      const newRight  = Math.max(8, Math.min(window.innerWidth  - 100, ox + (window.innerWidth  - e.clientX) - (card.offsetWidth  - (window.innerWidth  - (window.innerWidth  - startR - card.offsetWidth)))))
+      const newBottom = Math.max(8, Math.min(window.innerHeight - 60,  oy + (window.innerHeight - e.clientY) - (card.offsetHeight - (window.innerHeight - (window.innerHeight - startB - card.offsetHeight)))))
+      card.style.right  = (window.innerWidth  - e.clientX - (card.offsetWidth  / 2)) + 'px'
+      card.style.bottom = (window.innerHeight - e.clientY - (card.offsetHeight / 2)) + 'px'
+      card.style.left   = 'auto'
+      card.style.top    = 'auto'
+    })
+    document.addEventListener('mouseup', ()=>{ dragging=false; document.body.style.userSelect='' })
+    // Touch support
+    handle.addEventListener('touchstart', e=>{
+      if(e.target.classList.contains('room-float-close')) return
+      dragging=true
+    }, {passive:true})
+    document.addEventListener('touchmove', e=>{
+      if(!dragging) return
+      const t=e.touches[0]
+      card.style.right  = (window.innerWidth  - t.clientX - card.offsetWidth/2)  + 'px'
+      card.style.bottom = (window.innerHeight - t.clientY - card.offsetHeight/2) + 'px'
+      card.style.left='auto'; card.style.top='auto'
+    }, {passive:true})
+    document.addEventListener('touchend', ()=>{ dragging=false })
+  })
+})()
 
 // ═══════════════════════════════════════════════════
 // AUTH
@@ -2662,8 +2728,12 @@ function sdPick(uid,el){
   if(list) list.classList.remove('open')
   const iid=el.dataset.iid, field=el.dataset.field, val=el.dataset.v
   if(iid&&field) updateItem(iid, field, val)
-  // Show room panel when a room is selected
-  if(field==='room_name') showRoomPanel(val)
+  if(field==='room_name'){
+    showRoomPanel(val)
+    // Make sure floating card is visible
+    const fc=$('room-float-card')
+    if(fc&&val) fc.classList.add('visible')
+  }
 }
 document.addEventListener('click', e=>{
   if(!e.target.closest('.srch-wrap')){
