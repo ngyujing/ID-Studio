@@ -514,7 +514,32 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 /* Quotation tab layout with room side panel */
 .quot-layout{display:block}
 .quot-main{min-width:0}
-/* Floating Room Details card — fixed to viewport */
+/* Floating Add Line button */
+#float-add-line{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--gold);
+  color:#fff;
+  border:none;
+  border-radius:24px;
+  padding:11px 22px;
+  font-size:13px;
+  font-weight:600;
+  font-family:var(--ff-b);
+  box-shadow:0 4px 20px rgba(0,0,0,.22);
+  cursor:pointer;
+  z-index:400;
+  display:none;
+  white-space:nowrap;
+  transition:background .15s, box-shadow .15s;
+}
+#float-add-line:hover{background:var(--gold2);box-shadow:0 6px 28px rgba(0,0,0,.30)}
+#float-add-line.visible{display:block}
+@media(max-width:768px){
+  #float-add-line{bottom:80px;left:50%;transform:translateX(-50%)}
+}
 #room-float-card{
   position:fixed;
   bottom:24px;
@@ -1037,6 +1062,32 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   </div>
 </div>
 
+<!-- SHARE MODAL -->
+<div id="share-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeShareModalBg(event)">
+  <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-family:var(--ff-h);font-size:18px;color:var(--gold)">Share Project</div>
+      <button onclick="closeShareModal()" style="background:transparent;border:none;color:var(--txt3);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div id="share-project-name" style="font-size:12px;color:var(--txt2);margin-bottom:14px;padding:8px 10px;background:var(--s3);border-radius:5px;border-left:3px solid var(--gold)"></div>
+    <div class="form-group">
+      <label class="form-label">Share with user</label>
+      <select id="share-user-sel" style="width:100%">
+        <option value="">— Select a user —</option>
+      </select>
+      <div style="font-size:10px;color:var(--txt3);margin-top:4px">Users with access can view and edit this project</div>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-top:4px" onclick="addShareUser()">+ Add User</button>
+    <div style="margin-top:14px;border-top:1px solid var(--bdr);padding-top:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Currently shared with</div>
+      <div id="share-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOATING ADD LINE BUTTON -->
+<button id="float-add-line" onclick="addItem()">+ Add Line</button>
+
 <!-- FLOATING ROOM DETAILS CARD -->
 <div id="room-float-card">
   <div id="room-float-drag-handle">
@@ -1149,7 +1200,7 @@ const CX_LABELS     = {'1.0':'Basic','1.3':'Premium','1.6':'Luxury'}
 // ── STATE ────────────────────────────────────────────
 let USER=null, PROFILE=null, TRADES=[], MATS=[]
 let QUOTES=[], Q=null, ROOMS=[], ITEMS=[]
-let OWNER_MAP={}   // id → profile, used by admin dashboard
+let OWNER_MAP={}, SHARED_IDS=new Set()
 let PROP_TYPE='hdb'
 let SETTINGS={ gst:9, validity:30 }   // loaded from profile on login
 let TIMERS={}, CUR_TAB='rooms'
@@ -1236,6 +1287,11 @@ function navTo(view){
   // Mobile back button — show only inside quotation builder
   const mbb=$('mobile-back-btn')
   if(mbb) mbb.style.display = isBuilder?'flex':'none'
+  // Hide floating buttons when leaving builder
+  if(!isBuilder){
+    $('float-add-line')?.classList.remove('visible')
+    $('room-float-card')?.classList.remove('visible')
+  }
   // Bottom nav active state
   const bnavMap={dashboard:'bnav-dashboard',database:'bnav-database',calc:'bnav-calc',settings:'bnav-settings'}
   document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'))
@@ -1266,9 +1322,11 @@ function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'))
   $('tb-'+tab)?.classList.add('active')
   navTo(tab)
-  // Show/hide floating room card
+  // Show/hide floating room card and Add Line button
   const fc=$('room-float-card')
   if(fc) fc.classList.toggle('visible', tab==='items')
+  const fab=$('float-add-line')
+  if(fab) fab.classList.toggle('visible', tab==='items')
   if(tab==='items')     renderItemsTable()
   if(tab==='trades')    renderTrades()
   if(tab==='moodboard') renderMoodboard()
@@ -1444,20 +1502,40 @@ function updateSidebarUser(){
 async function loadDashboard(){
   $('db-grid').innerHTML='<div class="empty-state"><span class="spinner"></span></div>'
   const isAdmin = PROFILE?.role === 'admin'
-  let query = db.from('v_quotation_summary').select('*').order('updated_at',{ascending:false})
-  // Non-admins only see their own projects
-  if(!isAdmin) query = query.eq('user_id', USER.id)
-  const {data,error} = await query
-  if(error){ toast('Failed to load projects','err'); return }
-  QUOTES = data||[]
-  // For admin: fetch owner names so we can show who owns each project
+
+  let ownQuotes=[], sharedQuotes=[]
+
+  if(isAdmin){
+    // Admin sees everything
+    const {data} = await db.from('v_quotation_summary').select('*').order('updated_at',{ascending:false})
+    ownQuotes = data||[]
+  } else {
+    // Own projects
+    const {data:own} = await db.from('v_quotation_summary')
+      .select('*').eq('user_id',USER.id).order('updated_at',{ascending:false})
+    ownQuotes = own||[]
+
+    // Projects shared with this user
+    const {data:shares} = await db.from('project_shares')
+      .select('quotation_id').eq('user_id',USER.id)
+    if(shares?.length){
+      const ids = shares.map(s=>s.quotation_id)
+      const {data:sq} = await db.from('v_quotation_summary')
+        .select('*').in('id',ids).order('updated_at',{ascending:false})
+      sharedQuotes = (sq||[]).filter(q=>q.user_id!==USER.id)
+    }
+  }
+
+  QUOTES = [...ownQuotes, ...sharedQuotes]
+  SHARED_IDS = new Set(sharedQuotes.map(q=>q.id))
+
+  // For admin: fetch owner names
   if(isAdmin && QUOTES.length){
     const ownerIds = [...new Set(QUOTES.map(q=>q.user_id))]
     const {data:owners} = await db.from('profiles').select('id,full_name,company_name,email').in('id',ownerIds)
-    OWNER_MAP = {}
-    ;(owners||[]).forEach(o=>{ OWNER_MAP[o.id]=o })
+    OWNER_MAP={}; (owners||[]).forEach(o=>{ OWNER_MAP[o.id]=o })
   } else {
-    OWNER_MAP = {}
+    OWNER_MAP={}
   }
   renderDashboard()
 }
@@ -1508,20 +1586,23 @@ function renderDashboard(){
   }
 
   const cards = filtered.map(q=>{
-    const owner   = isAdmin && OWNER_MAP[q.user_id]
+    const owner     = isAdmin && OWNER_MAP[q.user_id]
+    const isShared  = SHARED_IDS.has(q.id)
     const ownerBadge = owner
       ? `<div style="font-size:10px;color:var(--txt3);margin-top:2px;display:flex;align-items:center;gap:4px">
            <span style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:1px 7px;font-size:9px">
              👤 ${esc(owner.full_name||owner.email||'Unknown')}
            </span>
          </div>` : ''
+    const sharedBadge = isShared
+      ? `<span style="font-size:9px;background:var(--blu);color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Shared</span>` : ''
     const isOwn   = q.user_id === USER.id
     return `
     <div class="db-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
         <div>
           <div class="db-ref">${esc(q.ref_number)}</div>
-          <div class="db-proj">${esc(q.project_name)}</div>
+          <div class="db-proj">${esc(q.project_name)}${sharedBadge}</div>
           <div class="db-client">${esc(q.client_name||'No client set')}</div>
           ${ownerBadge}
         </div>
@@ -1537,6 +1618,7 @@ function renderDashboard(){
         <div class="db-acts">
           ${isAdmin&&!isOwn?`<span style="font-size:9px;color:var(--txt3);padding:2px 6px;border:1px solid var(--bdr);border-radius:3px">View only</span>`:''}
           <button class="btn-del" title="Duplicate" onclick="dupQuote('${q.id}')">⧉ Dup</button>
+          <button class="btn-del" title="Share project" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')" style="color:var(--blu);border-color:var(--blu)">⇗ Share</button>
           ${isOwn||isAdmin?`<button class="btn-del" title="Delete" onclick="delQuote('${q.id}')">✕</button>`:''}
           <button class="btn-primary" style="padding:4px 11px;font-size:11px" onclick="openQuote('${q.id}')">Open →</button>
         </div>
@@ -3010,6 +3092,87 @@ function closeCrudModal(){
   $('crud-modal-bg').style.display='none'
   CRUD_MODE=null;CRUD_DATA={}
   const btn=$('crud-save-btn');btn.disabled=false;btn.textContent='Save'
+}
+
+// ═══════════════════════════════════════════════════
+// PROJECT SHARING
+// ═══════════════════════════════════════════════════
+let SHARE_QUOTE_ID = null
+
+async function openShareModal(quoteId, projectName){
+  SHARE_QUOTE_ID = quoteId
+  $('share-project-name').textContent = '📁 ' + (projectName||'Untitled project')
+  $('share-list').innerHTML = '<div class="empty-state"><span class="spinner"></span></div>'
+  $('share-modal-bg').style.display = 'flex'
+
+  // Populate user dropdown (all users except self and owner)
+  const {data:allUsers} = await db.from('profiles').select('id,full_name,email,company_name').order('full_name')
+  const {data:quote}    = await db.from('quotations').select('user_id').eq('id',quoteId).single()
+  const ownerID = quote?.user_id
+  const sel = $('share-user-sel')
+  sel.innerHTML = '<option value="">— Select a user —</option>'
+  ;(allUsers||[]).forEach(u=>{
+    if(u.id===USER.id || u.id===ownerID) return
+    const label = (u.full_name||u.email||'Unknown') + (u.company_name ? ` (${u.company_name})` : '')
+    sel.innerHTML += `<option value="${u.id}">${esc(label)}</option>`
+  })
+
+  await renderShareList(quoteId)
+}
+
+async function renderShareList(quoteId){
+  const {data:shares} = await db.from('project_shares')
+    .select('id,user_id,profiles(full_name,email,company_name)')
+    .eq('quotation_id', quoteId)
+
+  const list = $('share-list')
+  if(!shares||!shares.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--txt3);padding:8px 0">Not shared with anyone yet</div>'
+    return
+  }
+  list.innerHTML = shares.map(s=>{
+    const p = s.profiles||{}
+    const name = p.full_name || p.email || 'Unknown'
+    const co   = p.company_name ? ` · ${p.company_name}` : ''
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr2);font-size:12px">
+      <div>
+        <span style="font-weight:500;color:var(--txt)">${esc(name)}</span>
+        <span style="color:var(--txt3)">${esc(co)}</span>
+      </div>
+      <button class="btn-del" style="padding:3px 8px;font-size:10px" onclick="removeShareUser('${s.id}','${quoteId}')">Remove</button>
+    </div>`
+  }).join('')
+}
+
+async function addShareUser(){
+  const userId = $('share-user-sel').value
+  if(!userId){ toast('Select a user first','err'); return }
+  // Check not already shared
+  const {data:existing} = await db.from('project_shares')
+    .select('id').eq('quotation_id',SHARE_QUOTE_ID).eq('user_id',userId).single()
+  if(existing){ toast('Already shared with this user','err'); return }
+  const {error} = await db.from('project_shares').insert({
+    quotation_id: SHARE_QUOTE_ID,
+    user_id: userId,
+    shared_by: USER.id,
+  })
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast('Project shared ✓')
+  $('share-user-sel').value = ''
+  await renderShareList(SHARE_QUOTE_ID)
+}
+
+async function removeShareUser(shareId, quoteId){
+  const {error} = await db.from('project_shares').delete().eq('id',shareId)
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast('Share removed')
+  await renderShareList(quoteId)
+}
+
+function closeShareModalBg(e){ if(e.target===$('share-modal-bg')) closeShareModal() }
+function closeShareModal(){
+  $('share-modal-bg').style.display='none'
+  SHARE_QUOTE_ID=null
 }
 
 // ═══════════════════════════════════════════════════
