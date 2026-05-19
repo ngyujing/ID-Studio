@@ -1814,7 +1814,7 @@ function getWallArea(r){
   walls.forEach(w=>{
     const l = parseFloat(w.length)||0
     const h = parseFloat(w.height)||0
-    total += r.unit==='m' ? l*h : (l/3.281)*(h)   // height always in m
+    total += r.unit==='m' ? l*h : (l/3.28084)*(h)   // height always in m
   })
   return {sqm:+total.toFixed(2), sqft:+(total*SQM_TO_SQFT).toFixed(1)}
 }
@@ -1853,8 +1853,7 @@ function updateWall(roomId,idx,field,value){
     })
     return {...r, walls}
   })
-  updateRoomBadge(roomId)
-  updateRoomsSummary()
+  renderRooms()     // full re-render so conversion line and area are always fresh
   updateKPIs()
   saveWallsDebounced(roomId)
 }
@@ -1898,8 +1897,8 @@ function updateRoomBadge(id){
   if(convSpans.length){
     const l=parseFloat(room.length)||0, w2=parseFloat(room.width)||0
     convSpans[0].textContent = room.unit==='m'
-      ? fmtN(l*3.281,1)+' × '+fmtN(w2*3.281,1)+' ft'
-      : fmtN(l/3.281,2)+' × '+fmtN(w2/3.281,2)+' m'
+      ? fmtN(l*3.28084,1)+' × '+fmtN(w2*3.28084,1)+' ft'
+      : fmtN(l/3.28084,2)+' × '+fmtN(w2/3.28084,2)+' m'
   }
 }
 
@@ -1967,7 +1966,7 @@ function renderRooms(){
 
     const wallRows=walls.map((w,i)=>{
       const l=parseFloat(w.length)||0, h=parseFloat(w.height)||0
-      const wallSqm  = r.unit==='m' ? l*h : (l/3.281)*h
+      const wallSqm  = r.unit==='m' ? l*h : (l/3.28084)*h
       const wallSqft = +(wallSqm*SQM_TO_SQFT).toFixed(1)
       return `<div style="margin-bottom:5px">
         <div class="wall-row">
@@ -1979,8 +1978,8 @@ function renderRooms(){
         ${l&&h?`<div style="font-size:10px;color:var(--txt3);text-align:right;padding:2px 2px 0 0">
           ${esc(w.name||'Wall')}: <strong style="color:var(--gold)">${wallSqft} sqft</strong> (${wallSqm.toFixed(2)} sqm)
           &nbsp;·&nbsp; L = ${r.unit==='m'
-            ? fmtN(l*3.281,1)+' ft'
-            : fmtN(l/3.281,2)+' m'}
+            ? fmtN(l*3.28084,1)+' ft'
+            : fmtN(l/3.28084,2)+' m'}
         </div>`:''}</div>`
     }).join('')
 
@@ -2023,8 +2022,8 @@ function renderRooms(){
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px 0;font-size:10px;color:var(--txt3)">
         <span>${r.unit==='m'?'In feet:':'In metres:'}</span>
         <span data-conv style="color:var(--txt2)">${r.unit==='m'
-          ? fmtN((r.length||0)*3.281,1)+' × '+fmtN((r.width||0)*3.281,1)+' ft'
-          : fmtN((r.length||0)/3.281,2)+' × '+fmtN((r.width||0)/3.281,2)+' m'}</span>
+          ? fmtN((r.length||0)*3.28084,1)+' × '+fmtN((r.width||0)*3.28084,1)+' ft'
+          : fmtN((r.length||0)/3.28084,2)+' × '+fmtN((r.width||0)/3.28084,2)+' m'}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 2px 0">
         <div style="font-size:10px;color:var(--txt3)">+10% buffer</div>
@@ -2136,7 +2135,7 @@ function showRoomPanel(roomName){
 
   const wallRows = walls.map(w=>{
     const l=parseFloat(w.length)||0, h=parseFloat(w.height)||0
-    const wSqm = r.unit==='m' ? l*h : (l/3.281)*h
+    const wSqm = r.unit==='m' ? l*h : (l/3.28084)*h
     const wSqft= +(wSqm*SQM_TO_SQFT).toFixed(1)
     return `<div class="room-side-wall">
       <div class="room-side-wall-name">${esc(w.name||'Wall')}</div>
@@ -2150,8 +2149,8 @@ function showRoomPanel(roomName){
       <span class="room-side-val">${r.length||0} × ${r.width||0} ${r.unit==='m'?'m':'ft'}</span></div>
     <div class="room-side-row"><span class="room-side-lbl">${r.unit==='m'?'In feet':'In metres'}</span>
       <span style="font-size:10px;color:var(--txt2)">${r.unit==='m'
-        ? fmtN((r.length||0)*3.281,1)+' × '+fmtN((r.width||0)*3.281,1)+' ft'
-        : fmtN((r.length||0)/3.281,2)+' × '+fmtN((r.width||0)/3.281,2)+' m'}</span></div>
+        ? fmtN((r.length||0)*3.28084,1)+' × '+fmtN((r.width||0)*3.28084,1)+' ft'
+        : fmtN((r.length||0)/3.28084,2)+' × '+fmtN((r.width||0)/3.28084,2)+' m'}</span></div>
     <div class="room-side-row"><span class="room-side-lbl">Floor area</span>
       <span class="room-side-val">${fmtN(fa.sqm,2)} sqm</span></div>
     <div class="room-side-row"><span class="room-side-lbl"></span>
@@ -3625,7 +3624,7 @@ function exportClientExcel(){
     const fa=getArea(r), wa=getWallArea(r)
     roomRows.push([r.name, r.length, r.width, r.unit, fa.sqm, fa.sqft, wa.sqm, wa.sqft])
     ;(r.walls||[]).forEach(w=>{
-      const wSqm  = r.unit==='m'?(parseFloat(w.length)||0)*(parseFloat(w.height)||0):(parseFloat(w.length)||0)/3.281*(parseFloat(w.height)||0)
+      const wSqm  = r.unit==='m'?(parseFloat(w.length)||0)*(parseFloat(w.height)||0):(parseFloat(w.length)||0)/3.28084*(parseFloat(w.height)||0)
       roomRows.push([`  └ ${w.name||'Wall'}`, w.length, w.height, r.unit==='m'?'m (H=m)':'ft (H=m)', '', '', +wSqm.toFixed(2), +(wSqm*SQM_TO_SQFT).toFixed(1)])
     })
   })
