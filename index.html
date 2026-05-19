@@ -2487,7 +2487,7 @@ function renderClientView(){
       <td style="white-space:pre-wrap">${escNl(m.descKey||'—')}${m.rooms.filter(Boolean).length?`<div style="font-size:9px;color:#aaa;margin-top:2px">${m.rooms.filter(Boolean).join(', ')}</div>`:''}</td>
       <td class="r">${fmtN(m.qty,2)} ${m.unit}</td>
       <td class="r">${fmtC(m.rateKey)}</td>
-      <td class="r">${fmtC(m.amount)}</td>
+      <td class="r">${m.amount>0?fmtC(m.amount):'<em style="color:#aaa">Included</em>'}</td>
     </tr>`).join('')
 
     // Per-trade disclaimer notes
@@ -2506,7 +2506,7 @@ function renderClientView(){
         <tbody>${rows}</tbody>
         <tfoot><tr>
           <td colspan="5" style="text-align:right;padding:6px 9px;color:#555;font-size:11px;font-weight:600">Sub-total</td>
-          <td style="text-align:right;padding:6px 9px;font-weight:700;color:#1A1A1A">${fmtC(trTotal)}</td>
+          <td style="text-align:right;padding:6px 9px;font-weight:700;color:#1A1A1A">${trTotal>0?fmtC(trTotal):'<em style="color:#aaa">Included</em>'}</td>
         </tr></tfoot>
       </table>
       ${disclaimerHtml}
@@ -3596,8 +3596,8 @@ function exportClientExcel(){
         m.spec,
         m.desc + (m.rooms.filter(Boolean).length ? ` [${m.rooms.filter(Boolean).join(', ')}]` : ''),
         `${fmtN(m.qty,2)} ${m.unit}`,
-        m.rate,
-        m.amount
+        m.rate>0 ? m.rate : 'Included',
+        m.amount>0 ? m.amount : 'Included'
       ])
     })
     detailRows.push(['','','','','Sub-total', trTotal])
