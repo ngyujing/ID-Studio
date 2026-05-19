@@ -1885,19 +1885,22 @@ function updateRoomBadge(id){
   const fNums=card.querySelectorAll('.floor-area-num')
   if(fNums[0]) fNums[0].textContent=fmtN(fa.sqm,2)
   if(fNums[1]) fNums[1].textContent=fmtN(fa.sqft,1)
+  // floor buffer
+  const bufEl=card.querySelector('[data-buf]')
+  if(bufEl) bufEl.textContent=withBuffer(fa.sqft)+' sqft'
+  // m↔ft conversion
+  const convEl=card.querySelector('[data-conv]')
+  if(convEl){
+    const l=parseFloat(room.length)||0, w=parseFloat(room.width)||0
+    convEl.textContent = room.unit==='m'
+      ? fmtN(l*3.28084,1)+' × '+fmtN(w*3.28084,1)+' ft'
+      : fmtN(l/3.28084,2)+' × '+fmtN(w/3.28084,2)+' m'
+  }
   // wall area nums
   const wSqm=card.querySelector('.wall-sqm')
   const wSqft=card.querySelector('.wall-sqft')
   if(wSqm)  wSqm.textContent=fmtN(wa.sqm,2)+' sqm'
   if(wSqft) wSqft.textContent=fmtN(wa.sqft,1)+' sqft'
-  // conversion row — find the span that shows "In feet/metres"
-  const convSpans=card.querySelectorAll('[data-conv]')
-  if(convSpans.length){
-    const l=parseFloat(room.length)||0, w2=parseFloat(room.width)||0
-    convSpans[0].textContent = room.unit==='m'
-      ? fmtN(l*3.28084,1)+' × '+fmtN(w2*3.28084,1)+' ft'
-      : fmtN(l/3.28084,2)+' × '+fmtN(w2/3.28084,2)+' m'
-  }
 }
 
 function updateRoomsSummary(){
@@ -2025,7 +2028,7 @@ function renderRooms(){
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 2px 0">
         <div style="font-size:10px;color:var(--txt3)">+10% buffer</div>
-        <div style="font-size:13px;font-weight:600;color:var(--grn)">${floorBufSqft} sqft</div>
+        <div data-buf style="font-size:13px;font-weight:600;color:var(--grn)">${floorBufSqft} sqft</div>
       </div>
       <div class="walls-section">
         <div class="walls-hd">
