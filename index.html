@@ -1674,6 +1674,53 @@ function renderDashboard(){
     </div>`
   }).join('')
 
+  // ── Orphaned quotations (no project_id) ──
+  const orphans=QUOTES.filter(q=>!q.project_id)
+  if(orphans.length && !SHOW_ARCHIVE){
+    const orphanCards=orphans.map(q=>{
+      const isShared=SHARED_IDS.has(q.id)
+      return `<div class="proj-card" id="pc_orphan_${q.id}">
+        <div class="proj-card-hd" onclick="toggleProject('orphan_${q.id}')">
+          <span class="proj-icon">📄</span>
+          <div style="flex:1;min-width:0">
+            <div class="proj-name">${esc(q.project_name||'Untitled')}${isShared?'<span style="font-size:9px;background:var(--blu);color:#fff;border-radius:8px;padding:1px 5px;margin-left:4px">Shared</span>':''}</div>
+            <div class="proj-meta">${esc(q.client_name||'')}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+              <button class="btn-del" style="padding:3px 7px;font-size:10px" onclick="moveToProject('${q.id}','${esc(q.project_name||'')}','${esc(q.client_name||'')}','${esc(q.address||'')}')">📁 Move</button>
+              <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')">⇗</button>
+              <button class="btn-del" style="padding:3px 7px;font-size:10px" onclick="delQuote('${q.id}')">✕</button>
+            </div>
+            <span class="proj-chevron">▶</span>
+          </div>
+        </div>
+        <div class="proj-versions">
+          <div class="version-row" onclick="openQuote('${q.id}')">
+            <span class="version-badge">${esc(q.version_label||'v1')}</span>
+            <div style="flex:1;min-width:0">
+              <div class="version-name">${esc(q.ref_number||'')}</div>
+              <div style="font-size:10px;color:var(--txt3)">${(q.total_revenue||0)>0?fmtC0(q.total_revenue)+' rev':'No items'} · ${esc(q.status||'draft')}</div>
+            </div>
+            <span class="version-date">${fmtDate(q.updated_at)}</span>
+            <div class="version-acts" onclick="event.stopPropagation()">
+              <button class="btn-del" style="padding:2px 6px;font-size:9px" onclick="dupQuote('${q.id}')">⧉</button>
+              <button class="btn-del" style="padding:2px 6px;font-size:9px" onclick="delQuote('${q.id}')">✕</button>
+            </div>
+          </div>
+          <div class="proj-add-ver" onclick="moveToProject('${q.id}','${esc(q.project_name||'')}','${esc(q.client_name||'')}','${esc(q.address||'')}')">
+            <span>📁</span> Move into a project folder
+          </div>
+        </div>
+      </div>`
+    }).join('')
+    if(orphanCards){
+      grid.innerHTML += `<div style="grid-column:1/-1;font-size:11px;color:var(--txt3);margin-top:10px;padding:8px 4px;border-top:1px dashed var(--bdr)">
+        📄 Existing quotations — open each one or use <strong>📁 Move</strong> to organise into a project folder
+      </div>${orphanCards}`
+    }
+  }
+
   const countEl=document.getElementById('dash-count')
   if(countEl) countEl.textContent=`${filtered.length} of ${PROJECTS.length} projects`
 }
@@ -1759,6 +1806,42 @@ async function addVersionToProject(projId, projName, clientName, address){
   }).select().single()
   if(error){ toast('Failed: '+error.message,'err'); return }
   toast(`Version ${label} created ✓`); openQuote(quote.id)
+}
+
+async function moveToProject(quoteId, projName, clientName, address){
+  // Let user pick: new project or existing
+  const existing=PROJECTS.filter(p=>p.status!=='archived')
+  let projId=null
+
+  if(existing.length){
+    const opts=existing.map((p,i)=>`${i+1}. ${p.name}`).join('\n')
+    const choice=window.prompt(
+      `Move "${projName}" into which project?\n\nEnter number to use existing, or 0 to create new:\n${opts}`,
+      '0'
+    )
+    if(choice===null) return
+    const idx=parseInt(choice)-1
+    if(idx>=0 && idx<existing.length) projId=existing[idx].id
+  }
+
+  if(!projId){
+    // Create new project
+    const name=window.prompt('New project name:', projName)
+    if(!name) return
+    const {data:proj,error}=await db.from('projects').insert({
+      user_id:USER.id, name, client_name:clientName, address, status:'active'
+    }).select().single()
+    if(error){ toast('Failed: '+error.message,'err'); return }
+    projId=proj.id
+  }
+
+  // Link the quotation to the project
+  const {error}=await db.from('quotations').update({
+    project_id:projId, version_label:'v1'
+  }).eq('id',quoteId)
+  if(error){ toast('Failed to move: '+error.message,'err'); return }
+  toast('Moved into project folder ✓')
+  await loadDashboard()
 }
 
 async function archiveProject(id, archive){
