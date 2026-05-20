@@ -131,6 +131,27 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .db-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
 .db-card{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:14px;transition:border-color .15s}
 .db-card:hover{border-color:var(--bdr2)}
+/* Project folder card */
+.proj-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;transition:border-color .15s}
+.proj-card:hover{border-color:var(--gold)}
+.proj-card.archived{opacity:.6}
+.proj-card-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;user-select:none;gap:8px}
+.proj-card-hd:hover .proj-name{color:var(--gold)}
+.proj-icon{font-size:18px;flex-shrink:0}
+.proj-name{font-family:var(--ff-h);font-size:15px;font-weight:500;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj-meta{font-size:10px;color:var(--txt3);white-space:nowrap}
+.proj-chevron{font-size:11px;color:var(--txt3);transition:transform .2s;flex-shrink:0}
+.proj-card.open .proj-chevron{transform:rotate(90deg)}
+.proj-versions{display:none;border-top:1px solid var(--bdr);padding:8px}
+.proj-card.open .proj-versions{display:block}
+.version-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;transition:background .12s}
+.version-row:hover{background:var(--s3)}
+.version-badge{font-size:9px;font-weight:700;background:var(--s3);border:1px solid var(--bdr2);color:var(--txt3);padding:2px 7px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.version-name{font-size:12px;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.version-date{font-size:10px;color:var(--txt3);white-space:nowrap}
+.version-acts{display:flex;gap:4px;flex-shrink:0}
+.proj-add-ver{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-top:4px;border:1px dashed var(--bdr2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--txt3);transition:all .15s}
+.proj-add-ver:hover{border-color:var(--gold);color:var(--gold)}
 .db-ref{font-size:10px;color:var(--txt3);letter-spacing:.08em;margin-bottom:2px}
 .db-proj{font-family:var(--ff-h);font-size:16px;font-weight:500;color:var(--txt);margin-bottom:2px}
 .db-client{font-size:11px;color:var(--txt2);margin-bottom:10px}
@@ -713,8 +734,11 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <!-- DASHBOARD -->
       <div id="V-dashboard">
         <div class="sec-hd">
-          <div><div class="sec-title">Projects</div><div class="sec-sub">All your saved quotations</div></div>
-          <button class="btn-primary" id="btn-new-quote" onclick="newQuote(this)">+ New Quotation</button>
+          <div><div class="sec-title">Projects</div><div class="sec-sub">Click a project to see quotation versions</div></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-ghost" id="btn-show-archive" onclick="toggleArchive()" style="font-size:11px">📦 Show Archived</button>
+            <button class="btn-primary" id="btn-new-project" onclick="openNewProjectModal()">+ New Project</button>
+          </div>
         </div>
         <div id="db-grid" class="db-grid"></div>
       </div>
@@ -1063,6 +1087,28 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   </div>
 </div>
 
+<!-- NEW PROJECT MODAL -->
+<div id="proj-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeProjModal()">
+  <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-family:var(--ff-h);font-size:18px;color:var(--gold)" id="proj-modal-title">New Project</div>
+      <button onclick="closeProjModal()" style="background:transparent;border:none;color:var(--txt3);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div class="form-group"><label class="form-label">Project Name *</label>
+      <input id="pm-name" placeholder="e.g. Tampines St 32 HDB Reno"></div>
+    <div class="form-group"><label class="form-label">Client Name</label>
+      <input id="pm-client" placeholder="Mr & Mrs Tan"></div>
+    <div class="form-group"><label class="form-label">Address</label>
+      <input id="pm-addr" placeholder="327 Tampines St 32 #08-12"></div>
+    <div class="form-group"><label class="form-label">First quotation version label</label>
+      <input id="pm-ver" placeholder="v1" value="v1"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--bdr)">
+      <button class="btn-ghost" onclick="closeProjModal()">Cancel</button>
+      <button class="btn-primary" id="pm-save-btn" onclick="createProject()">Create Project</button>
+    </div>
+  </div>
+</div>
+
 <!-- SHARE MODAL -->
 <div id="share-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="closeShareModalBg(event)">
   <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:22px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18)">
@@ -1200,6 +1246,7 @@ const CX_LABELS     = {'1.0':'Basic','1.3':'Premium','1.6':'Luxury'}
 // ── STATE ────────────────────────────────────────────
 let USER=null, PROFILE=null, TRADES=[], MATS=[]
 let QUOTES=[], Q=null, ROOMS=[], ITEMS=[]
+let PROJECTS=[], SHOW_ARCHIVE=false
 let OWNER_MAP={}, SHARED_IDS=new Set()
 let PROP_TYPE='hdb'
 let SETTINGS={ gst:9, validity:30 }   // loaded from profile on login
@@ -1512,133 +1559,230 @@ async function loadDashboard(){
   $('db-grid').innerHTML='<div class="empty-state"><span class="spinner"></span></div>'
   const isAdmin = PROFILE?.role === 'admin'
 
-  let ownQuotes=[], sharedQuotes=[]
+  let projQuery = db.from('projects').select('*').order('updated_at',{ascending:false})
+  if(!isAdmin) projQuery = projQuery.eq('user_id', USER.id)
+  const {data:projects} = await projQuery
+  PROJECTS = projects||[]
 
-  if(isAdmin){
-    // Admin sees everything
-    const {data} = await db.from('v_quotation_summary').select('*').order('updated_at',{ascending:false})
-    ownQuotes = data||[]
-  } else {
-    // Own projects
-    const {data:own} = await db.from('v_quotation_summary')
-      .select('*').eq('user_id',USER.id).order('updated_at',{ascending:false})
-    ownQuotes = own||[]
+  let quoteQuery = db.from('v_quotation_summary').select('*').order('created_at',{ascending:false})
+  if(!isAdmin) quoteQuery = quoteQuery.eq('user_id', USER.id)
+  const {data:ownQuotes} = await quoteQuery
+  QUOTES = ownQuotes||[]
+  SHARED_IDS = new Set()
 
-    // Projects shared with this user
-    const {data:shares} = await db.from('project_shares')
-      .select('quotation_id').eq('user_id',USER.id)
+  if(!isAdmin){
+    const {data:shares} = await db.from('project_shares').select('quotation_id').eq('user_id',USER.id)
     if(shares?.length){
-      const ids = shares.map(s=>s.quotation_id)
-      const {data:sq} = await db.from('v_quotation_summary')
-        .select('*').in('id',ids).order('updated_at',{ascending:false})
-      sharedQuotes = (sq||[]).filter(q=>q.user_id!==USER.id)
+      const ids=shares.map(s=>s.quotation_id)
+      const {data:sq} = await db.from('v_quotation_summary').select('*').in('id',ids)
+      const extra=(sq||[]).filter(q=>q.user_id!==USER.id)
+      QUOTES=[...QUOTES,...extra]
+      SHARED_IDS=new Set(extra.map(q=>q.id))
     }
   }
 
-  QUOTES = [...ownQuotes, ...sharedQuotes]
-  SHARED_IDS = new Set(sharedQuotes.map(q=>q.id))
+  if(isAdmin && PROJECTS.length){
+    const ids=[...new Set(PROJECTS.map(p=>p.user_id))]
+    const {data:owners}=await db.from('profiles').select('id,full_name,email').in('id',ids)
+    OWNER_MAP={};(owners||[]).forEach(o=>{OWNER_MAP[o.id]=o})
+  } else OWNER_MAP={}
 
-  // For admin: fetch owner names
-  if(isAdmin && QUOTES.length){
-    const ownerIds = [...new Set(QUOTES.map(q=>q.user_id))]
-    const {data:owners} = await db.from('profiles').select('id,full_name,company_name,email').in('id',ownerIds)
-    OWNER_MAP={}; (owners||[]).forEach(o=>{ OWNER_MAP[o.id]=o })
-  } else {
-    OWNER_MAP={}
-  }
   renderDashboard()
 }
 
 function renderDashboard(){
-  const isAdmin = PROFILE?.role === 'admin'
+  const isAdmin=PROFILE?.role==='admin'
   const grid=$('db-grid')
+  const visibleProjects=PROJECTS.filter(p=>SHOW_ARCHIVE ? p.status==='archived' : p.status!=='archived')
 
-  // Admin filter bar
-  let filterHtml = ''
+  let filterHtml=''
   if(isAdmin){
-    const allOwners = [...new Set(QUOTES.map(q=>q.user_id))]
-    const ownerOpts = allOwners.map(id=>{
-      const o = OWNER_MAP[id]||{}
-      const label = o.full_name||o.email||id.slice(0,8)
-      return `<option value="${esc(id)}">${esc(label)}</option>`
-    }).join('')
-    filterHtml = `
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--bdr);border-radius:8px">
-        <span style="font-size:11px;color:var(--txt3);font-weight:600">🔍 Filter:</span>
-        <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
-          <option value="">All Users (${QUOTES.length} projects)</option>
-          ${ownerOpts}
-        </select>
-        <select id="dash-filter-status" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <span style="font-size:10px;color:var(--txt3);margin-left:auto" id="dash-count"></span>
-      </div>`
+    const owners=[...new Set(PROJECTS.map(p=>p.user_id))]
+    filterHtml=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--bdr);border-radius:8px">
+      <span style="font-size:11px;color:var(--txt3);font-weight:600">🔍 Filter:</span>
+      <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
+        <option value="">All Users</option>
+        ${owners.map(id=>{const o=OWNER_MAP[id]||{};return`<option value="${id}">${esc(o.full_name||o.email||id.slice(0,8))}</option>`}).join('')}
+      </select>
+      <span style="font-size:10px;color:var(--txt3);margin-left:auto" id="dash-count"></span>
+    </div>`
   }
 
-  if(!QUOTES.length){
-    grid.innerHTML=(isAdmin?filterHtml:'')+`<div class="empty-state"><div class="es-icon">◇</div><p>No quotations yet.</p><button class="btn-primary mt-12" onclick="newQuote(this)">Create your first quotation</button></div>`
+  if(!visibleProjects.length){
+    grid.innerHTML=filterHtml+`<div class="empty-state"><div class="es-icon">${SHOW_ARCHIVE?'📦':'📁'}</div>
+      <p>${SHOW_ARCHIVE?'No archived projects':'No active projects yet'}</p>
+      ${!SHOW_ARCHIVE?`<button class="btn-primary mt-12" onclick="openNewProjectModal()">Create your first project</button>`:''}
+    </div>`
     return
   }
 
-  // Apply filters (admin only)
-  let filtered = QUOTES
+  let filtered=visibleProjects
   if(isAdmin){
-    const ownerSel  = document.getElementById('dash-filter-owner')?.value
-    const statusSel = document.getElementById('dash-filter-status')?.value
-    if(ownerSel)  filtered = filtered.filter(q=>q.user_id===ownerSel)
-    if(statusSel) filtered = filtered.filter(q=>q.status===statusSel)
+    const ownerSel=document.getElementById('dash-filter-owner')?.value
+    if(ownerSel) filtered=filtered.filter(p=>p.user_id===ownerSel)
   }
 
-  const cards = filtered.map(q=>{
-    const owner     = isAdmin && OWNER_MAP[q.user_id]
-    const isShared  = SHARED_IDS.has(q.id)
-    const ownerBadge = owner
-      ? `<div style="font-size:10px;color:var(--txt3);margin-top:2px;display:flex;align-items:center;gap:4px">
-           <span style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:1px 7px;font-size:9px">
-             👤 ${esc(owner.full_name||owner.email||'Unknown')}
-           </span>
-         </div>` : ''
-    const sharedBadge = isShared
-      ? `<span style="font-size:9px;background:var(--blu);color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Shared</span>` : ''
-    const isOwn   = q.user_id === USER.id
-    return `
-    <div class="db-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-        <div>
-          <div class="db-ref">${esc(q.ref_number)}</div>
-          <div class="db-proj">${esc(q.project_name)}${sharedBadge}</div>
-          <div class="db-client">${esc(q.client_name||'No client set')}</div>
-          ${ownerBadge}
+  grid.innerHTML=filterHtml+filtered.map(proj=>{
+    const versions=QUOTES.filter(q=>q.project_id===proj.id)
+      .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))
+    const isArchived=proj.status==='archived'
+    const owner=isAdmin&&OWNER_MAP[proj.user_id]
+
+    const versRows=versions.map((q,vi)=>{
+      const isShared=SHARED_IDS.has(q.id)
+      const label=q.version_label||`v${vi+1}`
+      const rev=q.total_revenue||0
+      return `<div class="version-row" onclick="openQuote('${q.id}')">
+        <span class="version-badge">${esc(label)}</span>
+        <div style="flex:1;min-width:0">
+          <div class="version-name">${esc(q.project_name||'Untitled')}${isShared?'<span style="font-size:9px;background:var(--blu);color:#fff;border-radius:8px;padding:1px 5px;margin-left:4px">Shared</span>':''}</div>
+          <div style="font-size:10px;color:var(--txt3)">${rev>0?fmtC0(rev)+' rev':'No items'} · ${esc(q.status||'draft')}</div>
         </div>
-        <span class="status-chip" style="color:${STATUS_COLORS[q.status]||'#6A6358'};border-color:${STATUS_COLORS[q.status]||'#6A6358'}">${q.status}</span>
-      </div>
-      <div class="db-kpis">
-        <div><div class="db-kpi-lbl">Revenue</div><div class="db-kpi-val gold-c">${fmtC0(q.total_revenue||0)}</div></div>
-        <div><div class="db-kpi-lbl">Cost</div><div class="db-kpi-val">${fmtC0(q.total_cost||0)}</div></div>
-        <div><div class="db-kpi-lbl">Margin</div><div class="db-kpi-val ${(q.margin_pct||0)>=0?'grn-c':'red-c'}">${q.margin_pct||0}%</div></div>
-      </div>
-      <div class="db-foot">
-        <span class="db-date">${fmtDate(q.updated_at)}</span>
-        <div class="db-acts">
-          ${isAdmin&&!isOwn?`<span style="font-size:9px;color:var(--txt3);padding:2px 6px;border:1px solid var(--bdr);border-radius:3px">View only</span>`:''}
-          <button class="btn-del" title="Duplicate" onclick="dupQuote('${q.id}')">⧉ Dup</button>
-          <button class="btn-del" title="Share project" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')" style="color:var(--blu);border-color:var(--blu)">⇗ Share</button>
-          ${isOwn||isAdmin?`<button class="btn-del" title="Delete" onclick="delQuote('${q.id}')">✕</button>`:''}
-          <button class="btn-primary" style="padding:4px 11px;font-size:11px" onclick="openQuote('${q.id}')">Open →</button>
+        <span class="version-date">${fmtDate(q.updated_at)}</span>
+        <div class="version-acts" onclick="event.stopPropagation()">
+          <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Duplicate" onclick="dupQuote('${q.id}')">⧉</button>
+          <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" title="Share" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')">⇗</button>
+          <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Delete version" onclick="delQuote('${q.id}')">✕</button>
         </div>
+      </div>`
+    }).join('')
+
+    return `<div class="proj-card${isArchived?' archived':''}" id="pc_${proj.id}">
+      <div class="proj-card-hd" onclick="toggleProject('${proj.id}')">
+        <span class="proj-icon">${isArchived?'📦':'📁'}</span>
+        <div style="flex:1;min-width:0">
+          <div class="proj-name">${esc(proj.name||'Untitled Project')}</div>
+          <div class="proj-meta">${esc(proj.client_name||'')}${proj.client_name?' · ':''}${versions.length} version${versions.length!==1?'s':''}${owner?' · '+esc(owner.full_name||owner.email||''):''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+            ${!isArchived?
+              `<button class="btn-del" style="padding:3px 7px;font-size:10px" title="Edit" onclick="openEditProjectModal('${proj.id}')">✎</button>
+               <button class="btn-del" style="padding:3px 7px;font-size:10px" title="Archive" onclick="archiveProject('${proj.id}',true)">📦</button>`
+            :`<button class="btn-del" style="padding:3px 7px;font-size:10px;color:var(--grn);border-color:var(--grn)" onclick="archiveProject('${proj.id}',false)">↩ Restore</button>`}
+            <button class="btn-del" style="padding:3px 7px;font-size:10px;color:var(--red);border-color:var(--red)" onclick="deleteProject('${proj.id}')">✕</button>
+          </div>
+          <span class="proj-chevron">▶</span>
+        </div>
+      </div>
+      <div class="proj-versions">
+        ${versRows||'<div style="font-size:11px;color:var(--txt3);padding:4px 8px">No quotation versions yet</div>'}
+        ${!isArchived?`<div class="proj-add-ver" onclick="addVersionToProject('${proj.id}','${esc(proj.name||'')}','${esc(proj.client_name||'')}','${esc(proj.address||'')}')">
+          <span>＋</span> Add quotation version
+        </div>`:''}
       </div>
     </div>`
   }).join('')
 
-  grid.innerHTML = (isAdmin ? filterHtml : '') + (filtered.length ? cards : '<div class="empty-state"><p>No projects match this filter.</p></div>')
-  const countEl = document.getElementById('dash-count')
-  if(countEl) countEl.textContent = `${filtered.length} of ${QUOTES.length} projects`
+  const countEl=document.getElementById('dash-count')
+  if(countEl) countEl.textContent=`${filtered.length} of ${PROJECTS.length} projects`
 }
+
+function toggleProject(id){
+  const card=document.getElementById('pc_'+id)
+  if(card) card.classList.toggle('open')
+}
+
+function toggleArchive(){
+  SHOW_ARCHIVE=!SHOW_ARCHIVE
+  const btn=$('btn-show-archive')
+  if(btn) btn.textContent=SHOW_ARCHIVE?'📁 Show Active':'📦 Show Archived'
+  renderDashboard()
+}
+
+let EDIT_PROJ_ID=null
+
+function openNewProjectModal(){
+  EDIT_PROJ_ID=null
+  $('proj-modal-title').textContent='New Project'
+  setV('pm-name',''); setV('pm-client',''); setV('pm-addr',''); setV('pm-ver','v1')
+  const vg=document.getElementById('pm-ver')?.parentElement
+  if(vg) vg.style.display=''
+  $('proj-modal-bg').style.display='flex'
+  setTimeout(()=>$('pm-name')?.focus(),80)
+}
+
+function openEditProjectModal(id){
+  EDIT_PROJ_ID=id
+  const p=PROJECTS.find(x=>x.id===id); if(!p) return
+  $('proj-modal-title').textContent='Edit Project'
+  setV('pm-name',p.name); setV('pm-client',p.client_name||''); setV('pm-addr',p.address||'')
+  const vg=document.getElementById('pm-ver')?.parentElement
+  if(vg) vg.style.display='none'
+  $('proj-modal-bg').style.display='flex'
+  setTimeout(()=>$('pm-name')?.focus(),80)
+}
+
+function closeProjModal(){
+  $('proj-modal-bg').style.display='none'; EDIT_PROJ_ID=null
+}
+
+async function createProject(){
+  const name=$('pm-name').value.trim()
+  if(!name){ toast('Project name is required','err'); return }
+  const btn=$('pm-save-btn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>'
+  try{
+    if(EDIT_PROJ_ID){
+      const {error}=await db.from('projects').update({
+        name, client_name:$('pm-client').value.trim(), address:$('pm-addr').value.trim(),
+        updated_at:new Date().toISOString()
+      }).eq('id',EDIT_PROJ_ID)
+      if(error) throw error
+      toast('Project updated ✓'); closeProjModal(); await loadDashboard(); return
+    }
+    const {data:proj,error:pErr}=await db.from('projects').insert({
+      user_id:USER.id, name, client_name:$('pm-client').value.trim(),
+      address:$('pm-addr').value.trim(), status:'active'
+    }).select().single()
+    if(pErr) throw pErr
+    const verLabel=$('pm-ver').value.trim()||'v1'
+    const {data:quote,error:qErr}=await db.from('quotations').insert({
+      user_id:USER.id, project_id:proj.id, ref_number:genRef(),
+      project_name:name, client_name:$('pm-client').value.trim(),
+      address:$('pm-addr').value.trim(), version_label:verLabel,
+      complexity:SETTINGS.complexity||1.3, status:'draft'
+    }).select().single()
+    if(qErr) throw qErr
+    toast('Project created ✓'); closeProjModal(); openQuote(quote.id)
+  }catch(e){ toast('Error: '+e.message,'err') }
+  finally{ btn.disabled=false; btn.textContent='Create Project' }
+}
+
+async function addVersionToProject(projId, projName, clientName, address){
+  const versions=QUOTES.filter(q=>q.project_id===projId)
+  const label=window.prompt(`New version label for "${projName}":`, 'v'+(versions.length+1))
+  if(!label) return
+  const {data:quote,error}=await db.from('quotations').insert({
+    user_id:USER.id, project_id:projId, ref_number:genRef(),
+    project_name:projName, client_name:clientName, address,
+    version_label:label, complexity:SETTINGS.complexity||1.3, status:'draft'
+  }).select().single()
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast(`Version ${label} created ✓`); openQuote(quote.id)
+}
+
+async function archiveProject(id, archive){
+  const {error}=await db.from('projects').update({
+    status:archive?'archived':'active', updated_at:new Date().toISOString()
+  }).eq('id',id)
+  if(error){ toast('Failed: '+error.message,'err'); return }
+  toast(archive?'Project archived ✓':'Project restored ✓')
+  await loadDashboard()
+}
+
+async function deleteProject(id){
+  const txt=window.prompt('Delete this project and ALL its quotation versions?\n\nType DELETE to confirm.')
+  if(txt!=='DELETE'){ if(txt!==null) toast('Type DELETE exactly','err'); return }
+  const versions=QUOTES.filter(q=>q.project_id===id)
+  for(const q of versions){
+    await db.from('quotation_items').delete().eq('quotation_id',q.id)
+    await db.from('quotation_rooms').delete().eq('quotation_id',q.id)
+    await db.from('quotations').delete().eq('id',q.id)
+  }
+  await db.from('projects').delete().eq('id',id)
+  toast('Project deleted'); await loadDashboard()
+}
+
 
 async function newQuote(btn){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>' }
