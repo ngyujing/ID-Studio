@@ -1583,27 +1583,45 @@ async function loadDashboard(){
   PROJECTS=[...ownProjects,...sharedProjects]
   SHARED_IDS=SHARED_PROJECT_IDS
 
-  // Quotations for all visible projects
-  if(PROJECTS.length){
-    const projIds=PROJECTS.map(p=>p.id)
-    const {data:allQ} = await db.from('v_quotation_summary')
-      .select('*').in('project_id',projIds).order('created_at',{ascending:false})
-    // Also own orphaned quotations (no project_id)
-    let orphanQ=[]
-    if(!isAdmin){
-      const {data:oq}=await db.from('v_quotation_summary')
-        .select('*').eq('user_id',USER.id).is('project_id',null)
-      orphanQ=oq||[]
+  // Load ALL quotations — query quotations table directly to ensure project_id is available
+  // Then join with summary view for KPI numbers
+  let rawQuotes=[], summaryMap={}
+
+  if(!isAdmin){
+    const {data:rq}=await db.from('quotations')
+      .select('id,project_id,project_name,client_name,address,ref_number,version_label,status,complexity,updated_at,created_at,user_id')
+      .eq('user_id',USER.id)
+      .neq('status','trashed')
+      .order('created_at',{ascending:false})
+    rawQuotes=rq||[]
+    // Also load quotations from shared projects
+    if(PROJECTS.length){
+      const sharedProjIds=[...SHARED_IDS]
+      if(sharedProjIds.length){
+        const {data:sq}=await db.from('quotations')
+          .select('id,project_id,project_name,client_name,address,ref_number,version_label,status,complexity,updated_at,created_at,user_id')
+          .in('project_id',sharedProjIds)
+          .neq('status','trashed')
+          .order('created_at',{ascending:false})
+        const ownIds=new Set(rawQuotes.map(q=>q.id))
+        rawQuotes=[...rawQuotes,...(sq||[]).filter(q=>!ownIds.has(q.id))]
+      }
     }
-    QUOTES=[...(allQ||[]),...orphanQ]
   } else {
-    // No projects — still load orphans
-    if(!isAdmin){
-      const {data:oq}=await db.from('v_quotation_summary')
-        .select('*').eq('user_id',USER.id).is('project_id',null)
-      QUOTES=oq||[]
-    } else QUOTES=[]
+    const {data:rq}=await db.from('quotations')
+      .select('id,project_id,project_name,client_name,address,ref_number,version_label,status,complexity,updated_at,created_at,user_id')
+      .neq('status','trashed')
+      .order('created_at',{ascending:false})
+    rawQuotes=rq||[]
   }
+
+  // Load summary KPIs from the view
+  if(rawQuotes.length){
+    const ids=rawQuotes.map(q=>q.id)
+    const {data:sv}=await db.from('v_quotation_summary').select('id,total_cost,total_revenue,margin_pct').in('id',ids)
+    ;(sv||[]).forEach(s=>{summaryMap[s.id]=s})
+  }
+  QUOTES=rawQuotes.map(q=>({...q,...(summaryMap[q.id]||{})}))
 
   // Admin: fetch owner names for all projects
   if(isAdmin && PROJECTS.length){
