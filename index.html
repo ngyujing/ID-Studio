@@ -302,6 +302,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 .mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
 .gold-c{color:var(--gold2)}.grn-c{color:var(--grn)}.red-c{color:var(--red)}
 #toast-wrap{position:fixed;bottom:80px;right:16px;display:flex;flex-direction:column;gap:7px;z-index:9999;pointer-events:none}
+#toast-wrap .toast{pointer-events:all}
 @media(min-width:769px){#toast-wrap{bottom:20px;right:20px}}
 .toast{background:var(--s1);border:1px solid var(--bdr);border-radius:5px;padding:10px 14px;font-size:12px;color:var(--txt);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:200px;animation:toastIn .2s ease}
 .toast.ok{border-color:var(--grn)}.toast.err{border-color:var(--red)}
@@ -1122,7 +1123,7 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
       <select id="share-user-sel" style="width:100%">
         <option value="">— Select a user —</option>
       </select>
-      <div style="font-size:10px;color:var(--txt3);margin-top:4px">Users with access can view and edit this project</div>
+      <div style="font-size:10px;color:var(--txt3);margin-top:4px">Shared users can view and edit all quotation versions in this project folder</div>
     </div>
     <button class="btn-primary" style="width:100%;margin-top:4px" onclick="addShareUser()">+ Add User</button>
     <div style="margin-top:14px;border-top:1px solid var(--bdr);padding-top:12px">
@@ -1559,28 +1560,52 @@ async function loadDashboard(){
   $('db-grid').innerHTML='<div class="empty-state"><span class="spinner"></span></div>'
   const isAdmin = PROFILE?.role === 'admin'
 
+  // Own projects
   let projQuery = db.from('projects').select('*').order('updated_at',{ascending:false})
   if(!isAdmin) projQuery = projQuery.eq('user_id', USER.id)
   const {data:projects} = await projQuery
-  PROJECTS = projects||[]
+  let ownProjects = (projects||[]).filter(p=>p.status!=='trashed')
 
-  let quoteQuery = db.from('v_quotation_summary').select('*').order('created_at',{ascending:false})
-  if(!isAdmin) quoteQuery = quoteQuery.eq('user_id', USER.id)
-  const {data:ownQuotes} = await quoteQuery
-  QUOTES = ownQuotes||[]
-  SHARED_IDS = new Set()
-
+  // Shared projects (via project_shares using project_id)
+  let sharedProjects=[], SHARED_PROJECT_IDS=new Set()
   if(!isAdmin){
-    const {data:shares} = await db.from('project_shares').select('quotation_id').eq('user_id',USER.id)
+    const {data:shares} = await db.from('project_shares')
+      .select('project_id').eq('user_id',USER.id)
     if(shares?.length){
-      const ids=shares.map(s=>s.quotation_id)
-      const {data:sq} = await db.from('v_quotation_summary').select('*').in('id',ids)
-      const extra=(sq||[]).filter(q=>q.user_id!==USER.id)
-      QUOTES=[...QUOTES,...extra]
-      SHARED_IDS=new Set(extra.map(q=>q.id))
+      const ids=shares.map(s=>s.project_id).filter(Boolean)
+      if(ids.length){
+        const {data:sp} = await db.from('projects').select('*').in('id',ids)
+        sharedProjects=(sp||[]).filter(p=>p.status!=='trashed'&&p.user_id!==USER.id)
+        SHARED_PROJECT_IDS=new Set(sharedProjects.map(p=>p.id))
+      }
     }
   }
+  PROJECTS=[...ownProjects,...sharedProjects]
+  SHARED_IDS=SHARED_PROJECT_IDS
 
+  // Quotations for all visible projects
+  if(PROJECTS.length){
+    const projIds=PROJECTS.map(p=>p.id)
+    const {data:allQ} = await db.from('v_quotation_summary')
+      .select('*').in('project_id',projIds).order('created_at',{ascending:false})
+    // Also own orphaned quotations (no project_id)
+    let orphanQ=[]
+    if(!isAdmin){
+      const {data:oq}=await db.from('v_quotation_summary')
+        .select('*').eq('user_id',USER.id).is('project_id',null)
+      orphanQ=oq||[]
+    }
+    QUOTES=[...(allQ||[]),...orphanQ]
+  } else {
+    // No projects — still load orphans
+    if(!isAdmin){
+      const {data:oq}=await db.from('v_quotation_summary')
+        .select('*').eq('user_id',USER.id).is('project_id',null)
+      QUOTES=oq||[]
+    } else QUOTES=[]
+  }
+
+  // Admin: fetch owner names for all projects
   if(isAdmin && PROJECTS.length){
     const ids=[...new Set(PROJECTS.map(p=>p.user_id))]
     const {data:owners}=await db.from('profiles').select('id,full_name,email').in('id',ids)
@@ -1641,7 +1666,7 @@ function renderDashboard(){
         <span class="version-date">${fmtDate(q.updated_at)}</span>
         <div class="version-acts" onclick="event.stopPropagation()">
           <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Duplicate" onclick="dupQuote('${q.id}')">⧉</button>
-          <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" title="Share" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')">⇗</button>
+          <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" title="Share" onclick="openShareModal('${proj.id}','${esc(proj.name||'')}')">⇗</button>
           <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Delete version" onclick="delQuote('${q.id}')">✕</button>
         </div>
       </div>`
@@ -1689,7 +1714,7 @@ function renderDashboard(){
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
               <button class="btn-del" style="padding:3px 7px;font-size:10px" onclick="moveToProject('${q.id}','${esc(q.project_name||'')}','${esc(q.client_name||'')}','${esc(q.address||'')}')">📁 Move</button>
-              <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" onclick="openShareModal('${q.id}','${esc(q.project_name||'')}')">⇗</button>
+              <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" onclick="openShareModal('${proj.id}','${esc(proj.name||'')}')">⇗</button>
               <button class="btn-del" style="padding:3px 7px;font-size:10px" onclick="delQuote('${q.id}')">✕</button>
             </div>
             <span class="proj-chevron">▶</span>
@@ -1854,8 +1879,30 @@ async function archiveProject(id, archive){
 }
 
 async function deleteProject(id){
-  const txt=window.prompt('Delete this project and ALL its quotation versions?\n\nType DELETE to confirm.')
-  if(txt!=='DELETE'){ if(txt!==null) toast('Type DELETE exactly','err'); return }
+  const proj=PROJECTS.find(p=>p.id===id)
+  if(!confirm(`Move "${proj?.name||'this project'}" to trash?\n\nYou will have 8 seconds to undo.`)) return
+
+  // Soft-delete: mark as trashed, hide immediately
+  await db.from('projects').update({status:'trashed'}).eq('id',id)
+  PROJECTS=PROJECTS.map(p=>p.id===id?{...p,status:'trashed'}:p)
+  renderDashboard()
+
+  // Undo toast
+  const el=document.createElement('div')
+  el.className='toast ok'
+  el.style.cssText='pointer-events:all;cursor:default;display:flex;align-items:center;gap:10px;min-width:260px'
+  el.innerHTML=`<span>Project moved to trash</span><button onclick="this.closest('.toast').dataset.undo='1'" style="background:var(--gold);color:#1A1508;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;flex-shrink:0">Undo</button>`
+  document.getElementById('toast-wrap').appendChild(el)
+
+  await new Promise(r=>setTimeout(r,8000))
+
+  if(el.dataset.undo==='1'){
+    await db.from('projects').update({status:'active'}).eq('id',id)
+    el.remove(); toast('Project restored ✓'); await loadDashboard(); return
+  }
+
+  el.remove()
+  // Commit the delete
   const versions=QUOTES.filter(q=>q.project_id===id)
   for(const q of versions){
     await db.from('quotation_items').delete().eq('quotation_id',q.id)
@@ -1863,7 +1910,7 @@ async function deleteProject(id){
     await db.from('quotations').delete().eq('id',q.id)
   }
   await db.from('projects').delete().eq('id',id)
-  toast('Project deleted'); await loadDashboard()
+  await loadDashboard()
 }
 
 
@@ -1940,10 +1987,28 @@ async function openQuote(id){
 }
 
 async function delQuote(id){
-  if(!confirm('Delete this quotation? This cannot be undone.')) return
-  const {error}=await db.from('quotations').delete().eq('id',id)
-  if(error) toast('Delete failed','err')
-  else { toast('Deleted'); loadDashboard() }
+  if(!confirm('Delete this quotation version? You will have 8 seconds to undo.')) return
+
+  // Soft-delete: flag it
+  await db.from('quotations').update({status:'trashed'}).eq('id',id)
+  QUOTES=QUOTES.map(q=>q.id===id?{...q,status:'trashed'}:q)
+  renderDashboard()
+
+  const el=document.createElement('div')
+  el.className='toast ok'
+  el.style.cssText='pointer-events:all;cursor:default;display:flex;align-items:center;gap:10px;min-width:260px'
+  el.innerHTML=`<span>Version deleted</span><button onclick="this.closest('.toast').dataset.undo='1'" style="background:var(--gold);color:#1A1508;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;flex-shrink:0">Undo</button>`
+  document.getElementById('toast-wrap').appendChild(el)
+  await new Promise(r=>setTimeout(r,8000))
+  if(el.dataset.undo==='1'){
+    await db.from('quotations').update({status:'draft'}).eq('id',id)
+    el.remove(); toast('Version restored ✓'); await loadDashboard(); return
+  }
+  el.remove()
+  await db.from('quotation_items').delete().eq('quotation_id',id)
+  await db.from('quotation_rooms').delete().eq('quotation_id',id)
+  await db.from('quotations').delete().eq('id',id)
+  await loadDashboard()
 }
 
 async function dupQuote(id){
@@ -3335,18 +3400,18 @@ function closeCrudModal(){
 // ═══════════════════════════════════════════════════
 // PROJECT SHARING
 // ═══════════════════════════════════════════════════
-let SHARE_QUOTE_ID = null
+let SHARE_PROJECT_ID = null
 
-async function openShareModal(quoteId, projectName){
-  SHARE_QUOTE_ID = quoteId
-  $('share-project-name').textContent = '📁 ' + (projectName||'Untitled project')
+async function openShareModal(projId, projName){
+  SHARE_PROJECT_ID = projId
+  $('share-project-name').textContent = '📁 ' + (projName||'Untitled project')
   $('share-list').innerHTML = '<div class="empty-state"><span class="spinner"></span></div>'
   $('share-modal-bg').style.display = 'flex'
 
   // Populate user dropdown (all users except self and owner)
   const {data:allUsers} = await db.from('profiles').select('id,full_name,email,company_name').order('full_name')
-  const {data:quote}    = await db.from('quotations').select('user_id').eq('id',quoteId).single()
-  const ownerID = quote?.user_id
+  const {data:proj}     = await db.from('projects').select('user_id').eq('id',projId).single()
+  const ownerID = proj?.user_id
   const sel = $('share-user-sel')
   sel.innerHTML = '<option value="">— Select a user —</option>'
   ;(allUsers||[]).forEach(u=>{
@@ -3354,30 +3419,25 @@ async function openShareModal(quoteId, projectName){
     const label = (u.full_name||u.email||'Unknown') + (u.company_name ? ` (${u.company_name})` : '')
     sel.innerHTML += `<option value="${u.id}">${esc(label)}</option>`
   })
-
-  await renderShareList(quoteId)
+  await renderShareList(projId)
 }
 
-async function renderShareList(quoteId){
+async function renderShareList(projId){
   const {data:shares} = await db.from('project_shares')
     .select('id,user_id,profiles(full_name,email,company_name)')
-    .eq('quotation_id', quoteId)
-
+    .eq('project_id', projId)
   const list = $('share-list')
   if(!shares||!shares.length){
     list.innerHTML = '<div style="font-size:11px;color:var(--txt3);padding:8px 0">Not shared with anyone yet</div>'
     return
   }
   list.innerHTML = shares.map(s=>{
-    const p = s.profiles||{}
-    const name = p.full_name || p.email || 'Unknown'
-    const co   = p.company_name ? ` · ${p.company_name}` : ''
+    const p=s.profiles||{}
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr2);font-size:12px">
-      <div>
-        <span style="font-weight:500;color:var(--txt)">${esc(name)}</span>
-        <span style="color:var(--txt3)">${esc(co)}</span>
+      <div><span style="font-weight:500;color:var(--txt)">${esc(p.full_name||p.email||'Unknown')}</span>
+        ${p.company_name?`<span style="color:var(--txt3)"> · ${esc(p.company_name)}</span>`:''}
       </div>
-      <button class="btn-del" style="padding:3px 8px;font-size:10px" onclick="removeShareUser('${s.id}','${quoteId}')">Remove</button>
+      <button class="btn-del" style="padding:3px 8px;font-size:10px" onclick="removeShareUser('${s.id}','${projId}')">Remove</button>
     </div>`
   }).join('')
 }
@@ -3385,33 +3445,30 @@ async function renderShareList(quoteId){
 async function addShareUser(){
   const userId = $('share-user-sel').value
   if(!userId){ toast('Select a user first','err'); return }
-  // Check not already shared
   const {data:existing} = await db.from('project_shares')
-    .select('id').eq('quotation_id',SHARE_QUOTE_ID).eq('user_id',userId).single()
+    .select('id').eq('project_id',SHARE_PROJECT_ID).eq('user_id',userId).maybeSingle()
   if(existing){ toast('Already shared with this user','err'); return }
   const {error} = await db.from('project_shares').insert({
-    quotation_id: SHARE_QUOTE_ID,
+    project_id: SHARE_PROJECT_ID,
     user_id: userId,
     shared_by: USER.id,
   })
   if(error){ toast('Failed: '+error.message,'err'); return }
-  toast('Project shared ✓')
+  toast('Project folder shared ✓')
   $('share-user-sel').value = ''
-  await renderShareList(SHARE_QUOTE_ID)
+  await renderShareList(SHARE_PROJECT_ID)
 }
 
-async function removeShareUser(shareId, quoteId){
+async function removeShareUser(shareId, projId){
   const {error} = await db.from('project_shares').delete().eq('id',shareId)
   if(error){ toast('Failed: '+error.message,'err'); return }
   toast('Share removed')
-  await renderShareList(quoteId)
+  await renderShareList(projId)
 }
 
 function closeShareModalBg(e){ if(e.target===$('share-modal-bg')) closeShareModal() }
-function closeShareModal(){
-  $('share-modal-bg').style.display='none'
-  SHARE_QUOTE_ID=null
-}
+function closeShareModal(){ $('share-modal-bg').style.display='none'; SHARE_PROJECT_ID=null }
+
 
 // ═══════════════════════════════════════════════════
 // USER MANAGEMENT
@@ -3907,8 +3964,18 @@ function exportClientExcel(){
   toast(`Exported: ${fileName}`)
 }
 
-// ═══════════════════════════════════════════════════
-// THEME TOGGLE
+// Ctrl+Z — click Undo on the most recent undo toast
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='z'){
+    e.preventDefault()
+    const toasts=document.querySelectorAll('#toast-wrap .toast')
+    // Find the last toast that has an Undo button
+    for(let i=toasts.length-1; i>=0; i--){
+      const btn=toasts[i].querySelector('button')
+      if(btn){ btn.click(); break }
+    }
+  }
+})
 // ═══════════════════════════════════════════════════
 function toggleTheme(){
   const isDark = document.documentElement.getAttribute('data-theme')==='dark'
