@@ -740,8 +740,11 @@ table.cv-tbl{width:100%;border-collapse:collapse;font-size:11px}
             <button class="btn-primary" id="btn-new-project" onclick="openNewProjectModal()">+ New Project</button>
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-          <div style="position:relative;flex:1;min-width:180px;max-width:320px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;justify-content:space-between">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="dash-filter-wrap">
+            <!-- filter inserted here by renderDashboard for admin, empty for users -->
+          </div>
+          <div style="position:relative;min-width:180px;max-width:260px">
             <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--txt3);font-size:13px;pointer-events:none">🔍</span>
             <input id="proj-search" type="text" placeholder="Search projects…"
               oninput="renderDashboard()"
@@ -1645,21 +1648,24 @@ function renderDashboard(){
   const grid=$('db-grid')
   const visibleProjects=PROJECTS.filter(p=>SHOW_ARCHIVE ? p.status==='archived' : p.status!=='archived')
 
-  let filterHtml=''
-  if(isAdmin){
-    const owners=[...new Set(PROJECTS.map(p=>p.user_id))]
-    filterHtml=`<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:11px;color:var(--txt3)">Filter by:</span>
-      <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--bdr);border-radius:4px;color:var(--txt)">
-        <option value="">All Users</option>
-        ${owners.map(id=>{const o=OWNER_MAP[id]||{};return`<option value="${id}">${esc(o.full_name||o.email||id.slice(0,8))}</option>`}).join('')}
-      </select>
-      <span style="font-size:10px;color:var(--txt3);margin-left:auto" id="dash-count"></span>
-    </div>`
+  // Inject filter bar into its slot (admin only)
+  const filterSlot=document.getElementById('dash-filter-wrap')
+  if(filterSlot){
+    if(isAdmin){
+      const owners=[...new Set(PROJECTS.map(p=>p.user_id))]
+      filterSlot.innerHTML=`<span style="font-size:11px;color:var(--txt3)">Filter by:</span>
+        <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px;background:transparent;border:1px solid var(--bdr);border-radius:4px;color:var(--txt)">
+          <option value="">All Users</option>
+          ${owners.map(id=>{const o=OWNER_MAP[id]||{};return`<option value="${id}">${esc(o.full_name||o.email||id.slice(0,8))}</option>`}).join('')}
+        </select>
+        <span style="font-size:10px;color:var(--txt3)" id="dash-count"></span>`
+    } else {
+      filterSlot.innerHTML=`<span style="font-size:10px;color:var(--txt3)" id="dash-count"></span>`
+    }
   }
 
   if(!visibleProjects.length){
-    grid.innerHTML=filterHtml+`<div class="empty-state"><div class="es-icon">${SHOW_ARCHIVE?'📦':'📁'}</div>
+    grid.innerHTML=`<div class="empty-state"><div class="es-icon">${SHOW_ARCHIVE?'📦':'📁'}</div>
       <p>${SHOW_ARCHIVE?'No archived projects':'No active projects yet'}</p>
       ${!SHOW_ARCHIVE?`<button class="btn-primary mt-12" onclick="openNewProjectModal()">Create your first project</button>`:''}
     </div>`
@@ -1674,7 +1680,7 @@ function renderDashboard(){
     if(ownerSel) filtered=filtered.filter(p=>p.user_id===ownerSel)
   }
 
-  grid.innerHTML=filterHtml+filtered.map(proj=>{
+  grid.innerHTML=filtered.map(proj=>{
     const versions=QUOTES.filter(q=>q.project_id===proj.id)
       .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))
     const isArchived=proj.status==='archived'
