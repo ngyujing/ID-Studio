@@ -1666,7 +1666,6 @@ function renderDashboard(){
         <span class="version-date">${fmtDate(q.updated_at)}</span>
         <div class="version-acts" onclick="event.stopPropagation()">
           <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Duplicate" onclick="dupQuote('${q.id}')">⧉</button>
-          <button class="btn-del" style="padding:2px 6px;font-size:9px;color:var(--blu);border-color:var(--blu)" title="Share" onclick="openShareModal('${proj.id}','${esc(proj.name||'')}')">⇗</button>
           <button class="btn-del" style="padding:2px 6px;font-size:9px" title="Delete version" onclick="delQuote('${q.id}')">✕</button>
         </div>
       </div>`
@@ -1683,6 +1682,7 @@ function renderDashboard(){
           <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
             ${!isArchived?
               `<button class="btn-del" style="padding:3px 7px;font-size:10px" title="Edit" onclick="openEditProjectModal('${proj.id}')">✎</button>
+               <button class="btn-del" style="padding:3px 7px;font-size:10px;color:var(--blu);border-color:var(--blu)" title="Share project folder" onclick="openShareModal('${proj.id}','${esc(proj.name||'')}')">⇗ Share</button>
                <button class="btn-del" style="padding:3px 7px;font-size:10px" title="Archive" onclick="archiveProject('${proj.id}',true)">📦</button>`
             :`<button class="btn-del" style="padding:3px 7px;font-size:10px;color:var(--grn);border-color:var(--grn)" onclick="archiveProject('${proj.id}',false)">↩ Restore</button>`}
             <button class="btn-del" style="padding:3px 7px;font-size:10px;color:var(--red);border-color:var(--red)" onclick="deleteProject('${proj.id}')">✕</button>
