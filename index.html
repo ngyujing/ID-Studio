@@ -1272,7 +1272,12 @@ const esc    = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 const escNl  = s => esc(s).replace(/\n/g,'<br>')
 const $     = id => document.getElementById(id)
 const setV  = (id,v) => { const e=$(id); if(e&&v!=null)e.value=v }
-const genRef= () => { const d=new Date(); return `${String(d.getFullYear()).slice(2)}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*99)+1).padStart(2,'0')}` }
+const genRef = () => {
+  const d=new Date()
+  const date=`${String(d.getFullYear()).slice(2)}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+  const unique=String(Math.floor(Math.random()*9000)+1000)  // 4-digit random: 1000–9999
+  return `${date}-${unique}`
+}
 const getArea = r => { const a=(r.length||0)*(r.width||0); return r.unit==='m'?{sqm:+a.toFixed(2),sqft:+(a*SQM_TO_SQFT).toFixed(1)}:{sqft:+a.toFixed(1),sqm:+(a/SQM_TO_SQFT).toFixed(2)} }
 const matsForTrade = tid => MATS.filter(m=>m.trade_id===tid)
 
@@ -2045,18 +2050,73 @@ async function delQuote(id){
 }
 
 async function dupQuote(id){
-  const {data:orig}=await db.from('quotations').select('*').eq('id',id).single()
-  const {data:items}=await db.from('quotation_items').select('*').eq('quotation_id',id)
-  const {data:rooms}=await db.from('quotation_rooms').select('*').eq('quotation_id',id)
+  // Fetch the original quotation and all its data
+  const [{data:orig},{data:items},{data:rooms}]=await Promise.all([
+    db.from('quotations').select('*').eq('id',id).single(),
+    db.from('quotation_items').select('*').eq('quotation_id',id).order('sort_order'),
+    db.from('quotation_rooms').select('*').eq('quotation_id',id).order('sort_order'),
+  ])
+  if(!orig){ toast('Could not find original quotation','err'); return }
+
+  // Ask for a version label for the copy
+  const existingVersions=QUOTES.filter(q=>q.project_id===orig.project_id)
+  const nextLabel='v'+(existingVersions.length+1)
+  const label=window.prompt('Version label for the duplicate:', nextLabel)
+  if(label===null) return   // user cancelled
+
+  const newRef=genRef()
   const {data:newQ,error}=await db.from('quotations').insert({
-    ...orig, id:undefined, ref_number:genRef(),
-    project_name:orig.project_name+' (Copy)', status:'draft',
-    created_at:undefined, updated_at:undefined
+    user_id:       USER.id,
+    project_id:    orig.project_id,
+    project_name:  orig.project_name,
+    client_name:   orig.client_name,
+    address:       orig.address,
+    ref_number:    newRef,
+    version_label: label||nextLabel,
+    complexity:    orig.complexity,
+    status:        'draft',
+    prop_type:     orig.prop_type,
   }).select().single()
-  if(error){ toast('Duplicate failed','err'); return }
-  if(items?.length) await db.from('quotation_items').insert(items.map(i=>({...i,id:undefined,quotation_id:newQ.id,created_at:undefined})))
-  if(rooms?.length) await db.from('quotation_rooms').insert(rooms.map(r=>({...r,id:undefined,quotation_id:newQ.id,created_at:undefined})))
-  toast('Duplicated'); loadDashboard()
+
+  if(error){ toast('Duplicate failed: '+error.message,'err'); return }
+
+  // Copy rooms (with walls_json)
+  if(rooms?.length){
+    const newRooms=rooms.map(r=>({
+      quotation_id: newQ.id,
+      name:         r.name,
+      length:       r.length,
+      width:        r.width,
+      unit:         r.unit,
+      walls_json:   r.walls_json,
+      sort_order:   r.sort_order,
+    }))
+    const {error:rErr}=await db.from('quotation_rooms').insert(newRooms)
+    if(rErr) toast('Warning: rooms copy failed','err')
+  }
+
+  // Copy line items
+  if(items?.length){
+    const newItems=items.map(i=>({
+      quotation_id: newQ.id,
+      room_name:    i.room_name,
+      trade_id:     i.trade_id,
+      material_id:  i.material_id,
+      description:  i.description,
+      quantity:     i.quantity,
+      unit:         i.unit,
+      cost_rate:    i.cost_rate,
+      client_rate:  i.client_rate,
+      sort_order:   i.sort_order,
+    }))
+    const {error:iErr}=await db.from('quotation_items').insert(newItems)
+    if(iErr) toast('Warning: items copy failed','err')
+  }
+
+  toast(`Duplicated as ${newRef} ✓`)
+  await loadDashboard()
+  // Open the new quotation immediately
+  openQuote(newQ.id)
 }
 
 // ═══════════════════════════════════════════════════
