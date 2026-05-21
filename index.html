@@ -128,29 +128,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .divider{height:1px;background:var(--bdr);margin:14px 0}
 
 /* DASHBOARD */
-.db-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
-.db-card{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:14px;transition:border-color .15s}
+.db-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.db-card{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:16px;transition:border-color .15s}
 .db-card:hover{border-color:var(--bdr2)}
-/* Project folder card */
-.proj-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;transition:border-color .15s}
+.proj-card{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;overflow:hidden;transition:border-color .15s}
 .proj-card:hover{border-color:var(--gold)}
 .proj-card.archived{opacity:.6}
-.proj-card-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;user-select:none;gap:8px}
+.proj-card-hd{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 14px;cursor:pointer;user-select:none;gap:10px}
 .proj-card-hd:hover .proj-name{color:var(--gold)}
-.proj-icon{font-size:18px;flex-shrink:0}
-.proj-name{font-family:var(--ff-h);font-size:15px;font-weight:500;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.proj-meta{font-size:10px;color:var(--txt3);white-space:nowrap}
-.proj-chevron{font-size:11px;color:var(--txt3);transition:transform .2s;flex-shrink:0}
+.proj-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.proj-name{font-family:var(--ff-h);font-size:17px;font-weight:500;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj-meta{font-size:11px;color:var(--txt3);margin-top:3px}
+.proj-chevron{font-size:11px;color:var(--txt3);transition:transform .2s;flex-shrink:0;margin-top:4px}
 .proj-card.open .proj-chevron{transform:rotate(90deg)}
-.proj-versions{display:none;border-top:1px solid var(--bdr);padding:8px}
+.proj-versions{display:none;border-top:1px solid var(--bdr);padding:10px 12px}
 .proj-card.open .proj-versions{display:block}
-.version-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;transition:background .12s}
+.version-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;transition:background .12s}
 .version-row:hover{background:var(--s3)}
-.version-badge{font-size:9px;font-weight:700;background:var(--s3);border:1px solid var(--bdr2);color:var(--txt3);padding:2px 7px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.version-badge{font-size:9px;font-weight:700;background:var(--s3);border:1px solid var(--bdr2);color:var(--txt3);padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0}
 .version-name{font-size:12px;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .version-date{font-size:10px;color:var(--txt3);white-space:nowrap}
 .version-acts{display:flex;gap:4px;flex-shrink:0}
-.proj-add-ver{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-top:4px;border:1px dashed var(--bdr2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--txt3);transition:all .15s}
+.proj-add-ver{display:flex;align-items:center;gap:6px;padding:8px 10px;margin-top:6px;border:1px dashed var(--bdr2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--txt3);transition:all .15s}
 .proj-add-ver:hover{border-color:var(--gold);color:var(--gold)}
 .db-ref{font-size:10px;color:var(--txt3);letter-spacing:.08em;margin-bottom:2px}
 .db-proj{font-family:var(--ff-h);font-size:16px;font-weight:500;color:var(--txt);margin-bottom:2px}
@@ -1641,9 +1640,9 @@ function renderDashboard(){
   let filterHtml=''
   if(isAdmin){
     const owners=[...new Set(PROJECTS.map(p=>p.user_id))]
-    filterHtml=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--bdr);border-radius:8px">
-      <span style="font-size:11px;color:var(--txt3);font-weight:600">🔍 Filter:</span>
-      <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:4px 8px">
+    filterHtml=`<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--txt3)">Filter by:</span>
+      <select id="dash-filter-owner" onchange="renderDashboard()" style="width:auto;font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--bdr);border-radius:4px;color:var(--txt)">
         <option value="">All Users</option>
         ${owners.map(id=>{const o=OWNER_MAP[id]||{};return`<option value="${id}">${esc(o.full_name||o.email||id.slice(0,8))}</option>`}).join('')}
       </select>
@@ -1692,9 +1691,9 @@ function renderDashboard(){
     return `<div class="proj-card${isArchived?' archived':''}" id="pc_${proj.id}">
       <div class="proj-card-hd" onclick="toggleProject('${proj.id}')">
         <span class="proj-icon">${isArchived?'📦':'📁'}</span>
-        <div style="flex:1;min-width:0">
+        <div style="flex:1;min-width:0;padding-right:4px">
           <div class="proj-name">${esc(proj.name||'Untitled Project')}</div>
-          <div class="proj-meta">${esc(proj.client_name||'')}${proj.client_name?' · ':''}${versions.length} version${versions.length!==1?'s':''}${owner?' · '+esc(owner.full_name||owner.email||''):''}</div>
+          <div class="proj-meta" style="margin-top:4px">${[proj.client_name, versions.length+' version'+(versions.length!==1?'s':''), owner?(owner.full_name||owner.email||''):null].filter(Boolean).join(' · ')}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
           <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
