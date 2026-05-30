@@ -1,0 +1,24 @@
+{
+  "name": "YJ Studio — Quotation Tool",
+  "short_name": "YJ Studio",
+  "description": "Interior Design Quotation & Project Management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F3EF",
+  "theme_color": "#A0732A",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
