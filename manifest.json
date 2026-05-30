@@ -2,7 +2,7 @@
   "name": "YJ Studio — Quotation Tool",
   "short_name": "YJ Studio",
   "description": "Interior Design Quotation & Project Management",
-  "start_url": "/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#F5F3EF",
   "theme_color": "#A0732A",
