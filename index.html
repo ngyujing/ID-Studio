@@ -1181,8 +1181,9 @@ const UNITS = ['sqft','sqm','ft','mtr','L','no.','Room','Lot','Set','pcs','Lump'
 
 const TRADE_ORDER = [
   'Professional Services','Preliminary & Post Works','Hacking & Demolition Works',
-  'Masonry & Tiling Works','Ceiling & Partition Works','Floor Works','Carpentry Works','Plumbing Works',
-  'Painting Works','Door Works','Glass / Mirror Works','Electrical Works',
+  'Masonry & Tiling Works','Floor Works','Carpentry Works','Stone & Table Top Works',
+  'Plumbing Works','Ceiling & Partition Works','Painting Works',
+  'Glass / Mirror Works','Door Works','Electrical Works','Electrical Works - Commercial','Notes',
 ]
 
 const TRADE_DISCLAIMERS = {
@@ -1320,10 +1321,15 @@ async function boot(){
 
 async function afterLogin(){
   showScreen('app')
-  await Promise.all([loadStaticData(),loadProfile()])
-  updateSidebarUser()
-  updateLastLogin()  // record login time
-  navTo('dashboard')
+  try{
+    await Promise.all([loadStaticData(),loadProfile()])
+    updateSidebarUser()
+    updateLastLogin()
+    navTo('dashboard')
+  } catch(e){
+    console.error('afterLogin error:', e)
+    toast('Failed to load app data: '+e.message, 'err')
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1332,6 +1338,11 @@ async function afterLogin(){
 function showScreen(n){
   $('S-auth').style.display = n==='auth'?'flex':'none'
   $('S-app').style.display  = n==='app' ?'flex':'none'
+  if(n==='auth'){
+    const btn=$('auth-btn')
+    if(btn){ btn.disabled=false; btn.textContent=authMode==='login'?'Sign In':'Create Account' }
+    $('auth-err').style.display='none'
+  }
 }
 
 const ALL_VIEWS=['dashboard','rooms','items','trades','moodboard','gantt','client','calc','settings','database','users']
